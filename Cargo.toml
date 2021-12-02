@@ -1,0 +1,20 @@
+[package]
+name = "dynamixel-tool"
+version = "1.0.0"
+edition = "2018"
+authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
+description = "Dynamixel test tool"
+homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
+
+[dependencies]
+anyhow = "^1.0"
+clap = "^2"
+env_logger = "^0.9"
+glob = "^0.3"
+json = "^0.12"
+log = "^0.4"
+nix = "^0.23"
+serialport = "^4"
+thiserror = "^1"
+
+[features]
