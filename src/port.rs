@@ -1,5 +1,6 @@
 use anyhow::Result;
 use core::time::Duration;
+use log::debug;
 use nix::{ioctl_read_bad, ioctl_write_ptr_bad};
 use serialport::{self, SerialPort};
 use serialport::{SerialPortType, TTYPort};
@@ -42,7 +43,9 @@ pub fn open_port(port_name: &str, baudrate: u32, force: bool) -> Result<TTYPort>
         .into());
     }
 
-    port.set_timeout(Duration::from_millis(1))?;
+    port.set_timeout(Duration::from_millis(10))?;
+
+    debug!("open_port OK: {} @ {} baud", &true_name, baudrate);
     Ok(port)
 }
 

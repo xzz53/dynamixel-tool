@@ -3,7 +3,7 @@ mod port;
 
 use clap::{App, AppSettings, Arg, SubCommand};
 use env_logger;
-use log::{debug, error};
+use log::error;
 
 use std::process;
 
@@ -179,8 +179,6 @@ fn main() {
             process::exit(1);
         }
     };
-
-    debug!("open_port OK");
 
     match matches.subcommand() {
         ("scan", Some(sub_m)) => {

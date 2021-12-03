@@ -62,8 +62,8 @@ fn ping(port: &mut TTYPort, id: u8) -> Result<()> {
     debug!("send {:?}", &buffer[0..len_write]);
     port.write(&buffer[0..len_write])?;
 
-    let len_read = port.read(&mut buffer)?;
-    debug!("recv {:?}", &buffer[0..len_read]);
+    port.read_exact(&mut buffer[0..6])?;
+    debug!("recv {:?}", &buffer[0..6]);
     decode_status(&buffer, &mut params)
         .map(|_| ())
         .ok_or(DxlError::BadPacket.into())
@@ -95,7 +95,8 @@ fn read1(port: &mut TTYPort, id: u8, address: u8, count: u8) -> Result<Vec<u8>> 
     debug!("send {:?}", &buffer[0..len_write]);
     port.write(&buffer[0..len_write])?;
 
-    let len_read = port.read(&mut buffer)?;
+    let len_read = 6 + count as usize;
+    port.read_exact(&mut buffer[0..len_read])?;
     debug!("recv {:?}", &buffer[0..len_read]);
     match decode_status(&buffer, &mut params) {
         Some(_) => Ok(params[0..count.into()].to_vec()),
@@ -128,8 +129,8 @@ fn write1(port: &mut TTYPort, id: u8, address: u8, data: &[u8]) -> Result<()> {
     debug!("send {:?}", &buffer[0..len_write]);
     port.write(&buffer[0..len_write])?;
 
-    let len_read = port.read(&mut buffer)?;
-    debug!("recv {:?}", &buffer[0..len_read]);
+    port.read_exact(&mut buffer[0..6])?;
+    debug!("recv {:?}", &buffer[0..6]);
     decode_status(&buffer, &mut params)
         .ok_or(DxlError::BadPacket.into())
         .map(|_| ())
