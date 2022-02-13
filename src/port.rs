@@ -20,7 +20,7 @@ pub enum OpenPortError {
     Rs485Error { port_name: String },
 }
 
-pub fn open_port(port_name: &str, baudrate: u32, force: bool) -> Result<TTYPort> {
+pub fn open_port(port_name: &str, baudrate: u32, force: bool) -> Result<impl SerialPort> {
     let true_name: String = if port_name == "auto" {
         guess_port()?
     } else {
@@ -52,7 +52,7 @@ pub fn open_port(port_name: &str, baudrate: u32, force: bool) -> Result<TTYPort>
 #[derive(PartialEq)]
 struct UsbId(u16, u16);
 
-static COMPATIBLE_IDS: &'static [UsbId] = &[UsbId(0x16d0, 0x06a7)];
+static COMPATIBLE_IDS: &[UsbId] = &[UsbId(0x16d0, 0x06a7)];
 
 fn do_open_port(port_name: &str, baudrate: u32) -> Result<TTYPort> {
     Ok(serialport::new(port_name, baudrate).open_native()?)
@@ -73,7 +73,7 @@ fn guess_port() -> Result<String> {
         })
         .map(|info| info.port_name)
         .next()
-        .ok_or(OpenPortError::NoCompatiblePort.into())
+        .ok_or_else(|| OpenPortError::NoCompatiblePort.into())
 }
 
 fn is_port_open(port_name: &str) -> bool {
@@ -108,10 +108,7 @@ trait Rs485 {
 
     fn rs485_is_supported(&self) -> bool {
         match self.rs485_is_enabled() {
-            Ok(enabled) => match self.rs485_enable(enabled) {
-                Ok(_) => true,
-                Err(_) => false,
-            },
+            Ok(enabled) => self.rs485_enable(enabled).is_ok(),
             Err(_) => false,
         }
     }

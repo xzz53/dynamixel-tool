@@ -2,15 +2,11 @@ mod dxl;
 mod port;
 
 use clap::{App, AppSettings, Arg, SubCommand};
-use env_logger;
 use log::error;
-
 use std::process;
 
-use json;
-
-use crate::dxl::{read, scan, write};
-use crate::port::open_port;
+use dxl::{read, scan, write};
+use port::open_port;
 
 fn main() {
     let matches = App::new("Dynamixel test tool")

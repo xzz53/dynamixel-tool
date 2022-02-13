@@ -1,6 +1,6 @@
 use anyhow::Result;
 use log::debug;
-use serialport::{self, TTYPort};
+// use serialport::{self, SerialPort};
 use std::io::{Read, Write};
 use thiserror::Error;
 
@@ -24,9 +24,7 @@ fn encode_instruction(buffer: &mut [u8], id: u8, instruction: u8, params: &[u8])
     buffer[3] = length;
     buffer[4] = instruction;
 
-    for i in 0..params.len() {
-        buffer[5 + i] = params[i];
-    }
+    buffer[5..(params.len() + 5)].clone_from_slice(params);
 
     buffer[5 + params.len()] = !buffer[2..5 + params.len()].iter().sum::<u8>();
     6 + params.len()
@@ -38,7 +36,7 @@ fn decode_status(buffer: &[u8], params: &mut [u8]) -> Option<usize> {
     }
 
     let param_length: usize = (buffer[3] - 2).into();
-    if buffer.len() < (6 + param_length).into() || buffer[0] != 0xFF || buffer[1] != 0xFF {
+    if buffer.len() < (6 + param_length) || buffer[0] != 0xFF || buffer[1] != 0xFF {
         return None;
     }
 
@@ -52,7 +50,7 @@ fn decode_status(buffer: &[u8], params: &mut [u8]) -> Option<usize> {
     Some(6 + param_length)
 }
 
-fn ping(port: &mut TTYPort, id: u8) -> Result<()> {
+fn ping<P: Read + Write>(port: &mut P, id: u8) -> Result<()> {
     let mut buffer: [u8; 255] = [0; 255];
     let mut params: [u8; 255] = [0; 255];
 
@@ -60,32 +58,34 @@ fn ping(port: &mut TTYPort, id: u8) -> Result<()> {
 
     debug!("ping {}", id);
     debug!("send {:?}", &buffer[0..len_write]);
-    port.write(&buffer[0..len_write])?;
+    port.write_all(&buffer[0..len_write])?;
 
     port.read_exact(&mut buffer[0..6])?;
     debug!("recv {:?}", &buffer[0..6]);
     decode_status(&buffer, &mut params)
         .map(|_| ())
-        .ok_or(DxlError::BadPacket.into())
+        .ok_or_else(|| DxlError::BadPacket.into())
 }
 
-pub fn scan(port: &mut TTYPort, retries: usize, scan_start: u8, scan_end: u8) -> Result<Vec<u8>> {
+pub fn scan<P: Read + Write>(
+    port: &mut P,
+    retries: usize,
+    scan_start: u8,
+    scan_end: u8,
+) -> Result<Vec<u8>> {
     let mut result: Vec<u8> = Vec::new();
     (scan_start..scan_end).into_iter().for_each(|id| {
         for _ in 0..=retries {
-            match ping(port, id) {
-                Ok(_) => {
-                    result.push(id);
-                    break;
-                }
-                Err(_) => (),
+            if ping(port, id).is_ok() {
+                result.push(id);
+                break;
             }
         }
     });
     Ok(result)
 }
 
-fn read1(port: &mut TTYPort, id: u8, address: u8, count: u8) -> Result<Vec<u8>> {
+fn read1<P: Read + Write>(port: &mut P, id: u8, address: u8, count: u8) -> Result<Vec<u8>> {
     let mut buffer: [u8; 255] = [0; 255];
     let mut params: [u8; 255] = [0; 255];
 
@@ -93,7 +93,7 @@ fn read1(port: &mut TTYPort, id: u8, address: u8, count: u8) -> Result<Vec<u8>> 
 
     debug!("read1 {} {} {}", id, address, count);
     debug!("send {:?}", &buffer[0..len_write]);
-    port.write(&buffer[0..len_write])?;
+    port.write_all(&buffer[0..len_write])?;
 
     let len_read = 6 + count as usize;
     port.read_exact(&mut buffer[0..len_read])?;
@@ -104,7 +104,13 @@ fn read1(port: &mut TTYPort, id: u8, address: u8, count: u8) -> Result<Vec<u8>> 
     }
 }
 
-pub fn read(port: &mut TTYPort, retries: usize, id: u8, address: u8, count: u8) -> Result<Vec<u8>> {
+pub fn read<P: Read + Write>(
+    port: &mut P,
+    retries: usize,
+    id: u8,
+    address: u8,
+    count: u8,
+) -> Result<Vec<u8>> {
     let mut error = None;
 
     for _ in 0..=retries {
@@ -116,7 +122,7 @@ pub fn read(port: &mut TTYPort, retries: usize, id: u8, address: u8, count: u8) 
     Err(error.unwrap())
 }
 
-fn write1(port: &mut TTYPort, id: u8, address: u8, data: &[u8]) -> Result<()> {
+fn write1<P: Read + Write>(port: &mut P, id: u8, address: u8, data: &[u8]) -> Result<()> {
     let mut buffer: [u8; 255] = [0; 255];
     let mut params: [u8; 255] = [0; 255];
 
@@ -127,16 +133,22 @@ fn write1(port: &mut TTYPort, id: u8, address: u8, data: &[u8]) -> Result<()> {
 
     debug!("write1 {} {} {:?}", id, address, data);
     debug!("send {:?}", &buffer[0..len_write]);
-    port.write(&buffer[0..len_write])?;
+    port.write_all(&buffer[0..len_write])?;
 
     port.read_exact(&mut buffer[0..6])?;
     debug!("recv {:?}", &buffer[0..6]);
     decode_status(&buffer, &mut params)
-        .ok_or(DxlError::BadPacket.into())
+        .ok_or_else(|| DxlError::BadPacket.into())
         .map(|_| ())
 }
 
-pub fn write(port: &mut TTYPort, retries: usize, id: u8, address: u8, data: &[u8]) -> Result<()> {
+pub fn write<P: Read + Write>(
+    port: &mut P,
+    retries: usize,
+    id: u8,
+    address: u8,
+    data: &[u8],
+) -> Result<()> {
     let mut error = None;
 
     for _ in 0..=retries {
