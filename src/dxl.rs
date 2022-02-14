@@ -1,6 +1,5 @@
 use anyhow::Result;
 use log::debug;
-// use serialport::{self, SerialPort};
 use std::io::{Read, Write};
 use thiserror::Error;
 
@@ -8,6 +7,11 @@ use thiserror::Error;
 pub enum DxlError {
     #[error("corrupted status packet")]
     BadPacket,
+}
+
+pub enum Protocol {
+    V1,
+    V2,
 }
 
 const OPCODE_PING: u8 = 1;
@@ -86,8 +90,8 @@ pub fn scan<P: Read + Write>(
 }
 
 fn read1<P: Read + Write>(port: &mut P, id: u8, address: u8, count: u8) -> Result<Vec<u8>> {
-    let mut buffer: [u8; 255] = [0; 255];
-    let mut params: [u8; 255] = [0; 255];
+    let mut buffer = [0u8; 255];
+    let mut params = [0u8; 255];
 
     let len_write = encode_instruction(&mut buffer, id, OPCODE_READ, &[address, count]);
 

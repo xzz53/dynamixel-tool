@@ -1,14 +1,181 @@
 mod dxl;
 mod port;
 
-use clap::{App, AppSettings, Arg, SubCommand};
+use anyhow::Result;
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use log::error;
-use std::process;
+use std::{collections::HashMap, process};
 
-use dxl::{read, scan, write};
-use port::open_port;
+use dxl::{read, scan, write, Protocol};
+use port::{open_port, NativePort};
+
+enum OutputFormat {
+    Plain,
+    Json,
+}
+
+fn cmd_scan(
+    matches: &ArgMatches,
+    port: &mut NativePort,
+    _proto: Protocol,
+    retries: usize,
+    fmt: OutputFormat,
+) -> Result<String> {
+    let scan_start: u8 = matches
+        .value_of("scan_start")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+    let scan_end: u8 = matches
+        .value_of("scan_end")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+
+    scan(port, retries, scan_start, scan_end).map(|ids| match fmt {
+        OutputFormat::Plain => ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<String>>()
+            .join("\n"),
+        OutputFormat::Json => json::stringify(ids),
+    })
+}
+
+fn cmd_read_uint8(
+    matches: &ArgMatches,
+    port: &mut NativePort,
+    _proto: Protocol,
+    retries: usize,
+    _fmt: OutputFormat,
+) -> Result<String> {
+    let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
+    let address: u8 = matches
+        .value_of("address")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+
+    read(port, retries, id, address, 1).map(|bytes| format!("{}", bytes[0]))
+}
+
+fn cmd_read_uint16(
+    matches: &ArgMatches,
+    port: &mut NativePort,
+    _proto: Protocol,
+    retries: usize,
+    _fmt: OutputFormat,
+) -> Result<String> {
+    let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
+    let address: u8 = matches
+        .value_of("address")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+
+    read(port, retries, id, address, 2)
+        .map(|bytes| format!("{}", ((bytes[1] as u16) << 8) + (bytes[0] as u16)))
+}
+
+fn cmd_read_bytes(
+    matches: &ArgMatches,
+    port: &mut NativePort,
+    _proto: Protocol,
+    retries: usize,
+    fmt: OutputFormat,
+) -> Result<String> {
+    let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
+    let address: u8 = matches
+        .value_of("address")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+    let count: u8 = matches
+        .value_of("count")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+    read(port, retries, id, address, count).map(|ids| match fmt {
+        OutputFormat::Plain => ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<String>>()
+            .join("\n"),
+        OutputFormat::Json => json::stringify(ids),
+    })
+}
+
+fn cmd_write_uint8(
+    matches: &ArgMatches,
+    port: &mut NativePort,
+    _proto: Protocol,
+    retries: usize,
+    _fmt: OutputFormat,
+) -> Result<String> {
+    let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
+    let address: u8 = matches
+        .value_of("address")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+    let value: u8 = matches
+        .value_of("value")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+
+    write(port, retries, id, address, &[value]).map(|_| String::new())
+}
+
+fn cmd_write_uint16(
+    matches: &ArgMatches,
+    port: &mut NativePort,
+    _proto: Protocol,
+    retries: usize,
+    _fmt: OutputFormat,
+) -> Result<String> {
+    let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
+    let address: u8 = matches
+        .value_of("address")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+    let value: u16 = matches
+        .value_of("value")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+
+    let lo = (value & 0xff) as u8;
+    let hi = ((value >> 8) & 0xff) as u8;
+
+    write(port, retries, id, address, &[lo, hi]).map(|_| String::new())
+}
+
+fn cmd_write_bytes(
+    matches: &ArgMatches,
+    port: &mut NativePort,
+    _proto: Protocol,
+    retries: usize,
+    _fmt: OutputFormat,
+) -> Result<String> {
+    let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
+    let address: u8 = matches
+        .value_of("address")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+    let values: Vec<u8> = matches
+        .values_of("values")
+        .unwrap()
+        .map(|s| s.parse::<u8>().unwrap())
+        .collect();
+
+    write(port, retries, id, address, values.as_slice()).map(|_| String::new())
+}
+
+type Cmd = fn(&ArgMatches, &mut NativePort, Protocol, usize, OutputFormat) -> Result<String>;
 
 fn main() {
+    let mut cmds: HashMap<&str, Cmd> = HashMap::new();
+
+    cmds.insert("scan", cmd_scan);
+    cmds.insert("read-uint8", cmd_read_uint8);
+    cmds.insert("read-uint16", cmd_read_uint16);
+    cmds.insert("read-bytes", cmd_read_bytes);
+    cmds.insert("write-uint8", cmd_write_uint8);
+    cmds.insert("write-uint16", cmd_write_uint16);
+    cmds.insert("write-bytes", cmd_write_bytes);
+
     let matches = App::new("Dynamixel test tool")
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .version(env!("CARGO_PKG_VERSION"))
@@ -156,7 +323,11 @@ fn main() {
     .format_target(false)
     .init();
 
-    let json = matches.is_present("json");
+    let fmt = if matches.is_present("json") {
+        OutputFormat::Json
+    } else {
+        OutputFormat::Plain
+    };
     let force = matches.is_present("force");
     let port_name = matches.value_of("port").unwrap();
     let baudrate: u32 = matches
@@ -176,155 +347,11 @@ fn main() {
         }
     };
 
-    match matches.subcommand() {
-        ("scan", Some(sub_m)) => {
-            let scan_start: u8 = sub_m
-                .value_of("scan_start")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-            let scan_end: u8 = sub_m
-                .value_of("scan_end")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-
-            let ids = match scan(&mut port, retries, scan_start, scan_end) {
-                Ok(ids) => ids,
-                Err(e) => {
-                    error!("Scan error: {}", e);
-                    process::exit(1);
-                }
-            };
-            if !json {
-                for id in ids {
-                    println!("{}", id);
-                }
-            } else {
-                println!("{}", json::stringify(ids));
-            }
+    if let (name, Some(sub_matches)) = matches.subcommand() {
+        let cmd = cmds.get(name).unwrap();
+        match cmd(sub_matches, &mut port, Protocol::V1, retries, fmt) {
+            Ok(s) => println!("{}", s),
+            Err(e) => error!("{}", e),
         }
-        ("read-uint8", Some(sub_m)) => {
-            let id: u8 = sub_m.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-            let address: u8 = sub_m
-                .value_of("address")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-
-            let bytes = match read(&mut port, retries, id, address, 1) {
-                Ok(data) => data,
-                Err(e) => {
-                    error!("Read error: {}", e);
-                    process::exit(1);
-                }
-            };
-            println!("{}", bytes[0]);
-        }
-        ("read-uint16", Some(sub_m)) => {
-            let id: u8 = sub_m.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-            let address: u8 = sub_m
-                .value_of("address")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-
-            let bytes = match read(&mut port, retries, id, address, 2) {
-                Ok(data) => data,
-                Err(e) => {
-                    error!("Read error: {}", e);
-                    process::exit(1);
-                }
-            };
-            let val: u16 = 255 * (bytes[1] as u16) + (bytes[0] as u16);
-            println!("{}", val);
-        }
-        ("read-bytes", Some(sub_m)) => {
-            let id: u8 = sub_m.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-            let address: u8 = sub_m
-                .value_of("address")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-            let count: u8 = sub_m
-                .value_of("count")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-            let bytes = match read(&mut port, retries, id, address, count) {
-                Ok(data) => data,
-                Err(e) => {
-                    error!("Read error: {}", e);
-                    process::exit(1);
-                }
-            };
-            if !json {
-                for b in bytes {
-                    println!("{}", b);
-                }
-            } else {
-                println!("{}", json::stringify(bytes));
-            }
-        }
-        ("write-uint8", Some(sub_m)) => {
-            let id: u8 = sub_m.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-            let address: u8 = sub_m
-                .value_of("address")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-            let value: u8 = sub_m
-                .value_of("value")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-
-            match write(&mut port, retries, id, address, &[value]) {
-                Ok(_) => (),
-                Err(e) => {
-                    error!("Write error: {}", e);
-                    process::exit(1);
-                }
-            }
-        }
-        ("write-uint16", Some(sub_m)) => {
-            let id: u8 = sub_m.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-            let address: u8 = sub_m
-                .value_of("address")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-            let value: u16 = sub_m
-                .value_of("value")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-            let lo = (value & 0xff) as u8;
-            let hi = ((value >> 8) & 0xff) as u8;
-
-            match write(&mut port, retries, id, address, &[lo, hi]) {
-                Ok(_) => (),
-                Err(e) => {
-                    error!("Write error: {}", e);
-                    process::exit(1);
-                }
-            }
-        }
-        ("write-bytes", Some(sub_m)) => {
-            let id: u8 = sub_m.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-            let address: u8 = sub_m
-                .value_of("address")
-                .and_then(|s| s.parse().ok())
-                .unwrap();
-            let values: Vec<u8> = sub_m
-                .values_of("values")
-                .unwrap()
-                .map(|s| match s.parse::<u8>() {
-                    Ok(num) => num,
-                    Err(_) => {
-                        error!("Bad byte: '{}'", s);
-                        process::exit(1);
-                    }
-                })
-                .collect();
-            match write(&mut port, retries, id, address, values.as_slice()) {
-                Ok(_) => (),
-                Err(e) => {
-                    error!("Write error: {}", e);
-                    process::exit(1);
-                }
-            }
-        }
-        _ => (),
     }
 }
