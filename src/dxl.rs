@@ -30,7 +30,10 @@ fn encode_instruction(buffer: &mut [u8], id: u8, instruction: u8, params: &[u8])
 
     buffer[5..(params.len() + 5)].clone_from_slice(params);
 
-    buffer[5 + params.len()] = !buffer[2..5 + params.len()].iter().sum::<u8>();
+    buffer[5 + params.len()] = !buffer[2..5 + params.len()]
+        .iter()
+        .cloned()
+        .fold(0u8, |x, y| x.overflowing_add(y).0);
     6 + params.len()
 }
 
@@ -44,7 +47,11 @@ fn decode_status(buffer: &[u8], params: &mut [u8]) -> Option<usize> {
         return None;
     }
 
-    let csum: u8 = buffer[2..5 + param_length].iter().sum::<u8>();
+    let csum = buffer[2..5 + param_length]
+        .iter()
+        .cloned()
+        .fold(0u8, |x, y| x.overflowing_add(y).0);
+
     if csum != !buffer[5 + param_length] || buffer[4] != 0x0 {
         return None;
     }
