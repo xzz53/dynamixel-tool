@@ -302,6 +302,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("read-uint8")
+                .visible_alias("readb")
                 .about("Read unsigned 8-bit integer")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
                 .arg(
@@ -312,6 +313,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("read-uint16")
+                .visible_alias("readh")
                 .about("Read unsigned 16-bit integer")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
                 .arg(
@@ -322,6 +324,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("read-uint32")
+                .visible_alias("readw")
                 .about("Read unsigned 32-bit integer")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
                 .arg(
@@ -332,6 +335,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("read-bytes")
+                .visible_alias("reada")
                 .about("Read byte array")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
                 .arg(
@@ -343,6 +347,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("write-uint8")
+                .visible_alias("writeb")
                 .about("Write unsigned 8-bit integer")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
                 .arg(
@@ -358,6 +363,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("write-uint16")
+                .visible_alias("writeh")
                 .about("Write unsigned 16-bit integer")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
                 .arg(
@@ -373,6 +379,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("write-uint32")
+                .visible_alias("writew")
                 .about("Write unsigned 32-bit integer")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
                 .arg(
@@ -388,6 +395,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("write-bytes")
+                .visible_alias("writea")
                 .about("Write byte array")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
                 .arg(
