@@ -4,12 +4,8 @@ mod linux;
 mod windows;
 
 #[cfg(target_os = "linux")]
-pub use linux::NativePort;
-#[cfg(target_os = "linux")]
 use linux::{do_open_port, is_port_open};
 
-#[cfg(target_os = "windows")]
-pub use windows::NativePort;
 #[cfg(target_os = "windows")]
 use windows::{do_open_port, is_port_open};
 
@@ -46,7 +42,7 @@ struct UsbId(u16, u16);
 
 static COMPATIBLE_IDS: &[UsbId] = &[UsbId(0x16d0, 0x06a7), UsbId(0x0403, 0x6014)];
 
-pub fn open_port(port_name: &str, baudrate: u32, force: bool) -> Result<NativePort> {
+pub fn open_port(port_name: &str, baudrate: u32, force: bool) -> Result<Box<dyn SerialPort>> {
     let true_name: String = if port_name == "auto" {
         guess_port()?
     } else {
@@ -72,7 +68,7 @@ pub fn open_port(port_name: &str, baudrate: u32, force: bool) -> Result<NativePo
     port.set_timeout(Duration::from_millis(10))?;
 
     debug!("open_port OK: {} @ {} baud", &true_name, baudrate);
-    Ok(port)
+    Ok(Box::new(port))
 }
 
 fn guess_port() -> Result<String> {

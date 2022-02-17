@@ -1,13 +1,14 @@
-mod dxl;
 mod port;
+mod protocol;
 
 use anyhow::Result;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use log::error;
+use serialport::SerialPort;
+use std::convert::TryInto;
 use std::{collections::HashMap, process};
 
-use dxl::{read, scan, write, Protocol};
-use port::{open_port, NativePort};
+use protocol::{Protocol, ProtocolV1, ProtocolV2};
 
 enum OutputFormat {
     Plain,
@@ -16,8 +17,8 @@ enum OutputFormat {
 
 fn cmd_scan(
     matches: &ArgMatches,
-    port: &mut NativePort,
-    _proto: Protocol,
+    port: &mut dyn SerialPort,
+    proto: &dyn Protocol,
     retries: usize,
     fmt: OutputFormat,
 ) -> Result<String> {
@@ -30,84 +31,115 @@ fn cmd_scan(
         .and_then(|s| s.parse().ok())
         .unwrap();
 
-    scan(port, retries, scan_start, scan_end).map(|ids| match fmt {
-        OutputFormat::Plain => ids
-            .iter()
-            .map(|id| id.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"),
-        OutputFormat::Json => json::stringify(ids),
-    })
+    proto
+        .scan(port, retries, scan_start, scan_end)
+        .map(|ids| match fmt {
+            OutputFormat::Plain => ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+            OutputFormat::Json => json::stringify(ids),
+        })
 }
 
 fn cmd_read_uint8(
     matches: &ArgMatches,
-    port: &mut NativePort,
-    _proto: Protocol,
+    port: &mut dyn SerialPort,
+    proto: &dyn Protocol,
     retries: usize,
     _fmt: OutputFormat,
 ) -> Result<String> {
     let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-    let address: u8 = matches
+    let address: u16 = matches
         .value_of("address")
         .and_then(|s| s.parse().ok())
         .unwrap();
 
-    read(port, retries, id, address, 1).map(|bytes| format!("{}", bytes[0]))
+    proto
+        .read(port, retries, id, address, 1)
+        .map(|bytes| format!("{}", bytes[0]))
 }
 
 fn cmd_read_uint16(
     matches: &ArgMatches,
-    port: &mut NativePort,
-    _proto: Protocol,
+    port: &mut dyn SerialPort,
+    proto: &dyn Protocol,
     retries: usize,
     _fmt: OutputFormat,
 ) -> Result<String> {
     let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-    let address: u8 = matches
+    let address: u16 = matches
         .value_of("address")
         .and_then(|s| s.parse().ok())
         .unwrap();
 
-    read(port, retries, id, address, 2)
-        .map(|bytes| format!("{}", ((bytes[1] as u16) << 8) + (bytes[0] as u16)))
+    proto.read(port, retries, id, address, 2).map(|bytes| {
+        format!(
+            "{}",
+            u16::from_le_bytes(bytes.as_slice().try_into().unwrap())
+        )
+    })
+}
+
+fn cmd_read_uint32(
+    matches: &ArgMatches,
+    port: &mut dyn SerialPort,
+    proto: &dyn Protocol,
+    retries: usize,
+    _fmt: OutputFormat,
+) -> Result<String> {
+    let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
+    let address: u16 = matches
+        .value_of("address")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+
+    proto.read(port, retries, id, address, 4).map(|bytes| {
+        format!(
+            "{}",
+            u32::from_le_bytes(bytes.as_slice().try_into().unwrap())
+        )
+    })
 }
 
 fn cmd_read_bytes(
     matches: &ArgMatches,
-    port: &mut NativePort,
-    _proto: Protocol,
+    port: &mut dyn SerialPort,
+    proto: &dyn Protocol,
     retries: usize,
     fmt: OutputFormat,
 ) -> Result<String> {
     let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-    let address: u8 = matches
+    let address: u16 = matches
         .value_of("address")
         .and_then(|s| s.parse().ok())
         .unwrap();
-    let count: u8 = matches
+    let count: u16 = matches
         .value_of("count")
         .and_then(|s| s.parse().ok())
         .unwrap();
-    read(port, retries, id, address, count).map(|ids| match fmt {
-        OutputFormat::Plain => ids
-            .iter()
-            .map(|id| id.to_string())
-            .collect::<Vec<String>>()
-            .join("\n"),
-        OutputFormat::Json => json::stringify(ids),
-    })
+    proto
+        .read(port, retries, id, address, count)
+        .map(|ids| match fmt {
+            OutputFormat::Plain => ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+            OutputFormat::Json => json::stringify(ids),
+        })
 }
 
 fn cmd_write_uint8(
     matches: &ArgMatches,
-    port: &mut NativePort,
-    _proto: Protocol,
+    port: &mut dyn SerialPort,
+    proto: &dyn Protocol,
     retries: usize,
     _fmt: OutputFormat,
 ) -> Result<String> {
     let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-    let address: u8 = matches
+    let address: u16 = matches
         .value_of("address")
         .and_then(|s| s.parse().ok())
         .unwrap();
@@ -116,18 +148,20 @@ fn cmd_write_uint8(
         .and_then(|s| s.parse().ok())
         .unwrap();
 
-    write(port, retries, id, address, &[value]).map(|_| String::new())
+    proto
+        .write(port, retries, id, address, &[value])
+        .map(|_| String::new())
 }
 
 fn cmd_write_uint16(
     matches: &ArgMatches,
-    port: &mut NativePort,
-    _proto: Protocol,
+    port: &mut dyn SerialPort,
+    proto: &dyn Protocol,
     retries: usize,
     _fmt: OutputFormat,
 ) -> Result<String> {
     let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-    let address: u8 = matches
+    let address: u16 = matches
         .value_of("address")
         .and_then(|s| s.parse().ok())
         .unwrap();
@@ -136,21 +170,42 @@ fn cmd_write_uint16(
         .and_then(|s| s.parse().ok())
         .unwrap();
 
-    let lo = (value & 0xff) as u8;
-    let hi = ((value >> 8) & 0xff) as u8;
-
-    write(port, retries, id, address, &[lo, hi]).map(|_| String::new())
+    proto
+        .write(port, retries, id, address, &value.to_le_bytes())
+        .map(|_| String::new())
 }
 
-fn cmd_write_bytes(
+fn cmd_write_uint32(
     matches: &ArgMatches,
-    port: &mut NativePort,
-    _proto: Protocol,
+    port: &mut dyn SerialPort,
+    proto: &dyn Protocol,
     retries: usize,
     _fmt: OutputFormat,
 ) -> Result<String> {
     let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
-    let address: u8 = matches
+    let address: u16 = matches
+        .value_of("address")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+    let value: u32 = matches
+        .value_of("value")
+        .and_then(|s| s.parse().ok())
+        .unwrap();
+
+    proto
+        .write(port, retries, id, address, &value.to_le_bytes())
+        .map(|_| String::new())
+}
+
+fn cmd_write_bytes(
+    matches: &ArgMatches,
+    port: &mut dyn SerialPort,
+    proto: &dyn Protocol,
+    retries: usize,
+    _fmt: OutputFormat,
+) -> Result<String> {
+    let id: u8 = matches.value_of("id").and_then(|s| s.parse().ok()).unwrap();
+    let address: u16 = matches
         .value_of("address")
         .and_then(|s| s.parse().ok())
         .unwrap();
@@ -160,10 +215,13 @@ fn cmd_write_bytes(
         .map(|s| s.parse::<u8>().unwrap())
         .collect();
 
-    write(port, retries, id, address, values.as_slice()).map(|_| String::new())
+    proto
+        .write(port, retries, id, address, values.as_slice())
+        .map(|_| String::new())
 }
 
-type Cmd = fn(&ArgMatches, &mut NativePort, Protocol, usize, OutputFormat) -> Result<String>;
+type Cmd =
+    fn(&ArgMatches, &mut dyn SerialPort, &dyn Protocol, usize, OutputFormat) -> Result<String>;
 
 fn main() {
     let mut cmds: HashMap<&str, Cmd> = HashMap::new();
@@ -171,9 +229,11 @@ fn main() {
     cmds.insert("scan", cmd_scan);
     cmds.insert("read-uint8", cmd_read_uint8);
     cmds.insert("read-uint16", cmd_read_uint16);
+    cmds.insert("read-uint32", cmd_read_uint32);
     cmds.insert("read-bytes", cmd_read_bytes);
     cmds.insert("write-uint8", cmd_write_uint8);
     cmds.insert("write-uint16", cmd_write_uint16);
+    cmds.insert("write-uint32", cmd_write_uint32);
     cmds.insert("write-bytes", cmd_write_bytes);
 
     let matches = App::new("Dynamixel test tool")
@@ -219,6 +279,13 @@ fn main() {
                 .long("json")
                 .help("Use json-formatted output"),
         )
+        .arg(
+            Arg::with_name("protocol")
+                .short("P")
+                .long("protocol")
+                .default_value("1")
+                .help("Dynamixel protocol version"),
+        )
         .subcommand(
             SubCommand::with_name("scan")
                 .about("Scan for servos")
@@ -246,6 +313,16 @@ fn main() {
         .subcommand(
             SubCommand::with_name("read-uint16")
                 .about("Read unsigned 16-bit integer")
+                .arg(Arg::with_name("id").required(true).help("Servo id"))
+                .arg(
+                    Arg::with_name("address")
+                        .required(true)
+                        .help("Register address"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("read-uint32")
+                .about("Read unsigned 32-bit integer")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
                 .arg(
                     Arg::with_name("address")
@@ -295,6 +372,21 @@ fn main() {
                 ),
         )
         .subcommand(
+            SubCommand::with_name("write-uint32")
+                .about("Write unsigned 32-bit integer")
+                .arg(Arg::with_name("id").required(true).help("Servo id"))
+                .arg(
+                    Arg::with_name("address")
+                        .required(true)
+                        .help("Register address"),
+                )
+                .arg(
+                    Arg::with_name("value")
+                        .required(true)
+                        .help("Register value"),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("write-bytes")
                 .about("Write byte array")
                 .arg(Arg::with_name("id").required(true).help("Servo id"))
@@ -328,18 +420,33 @@ fn main() {
     } else {
         OutputFormat::Plain
     };
+
     let force = matches.is_present("force");
+
     let port_name = matches.value_of("port").unwrap();
+
     let baudrate: u32 = matches
         .value_of("baudrate")
         .and_then(|s| s.parse().ok())
-        .unwrap();
+        .expect("bad baudrate");
+
     let retries: usize = matches
         .value_of("retries")
         .and_then(|s| s.parse().ok())
-        .unwrap();
+        .expect("bad retries");
 
-    let mut port = match open_port(port_name, baudrate, force) {
+    let proto = matches
+        .value_of("protocol")
+        .and_then(|s| -> Option<Box<dyn Protocol>> {
+            match s {
+                "1" => Some(Box::new(ProtocolV1 {})),
+                "2" => Some(Box::new(ProtocolV2 {})),
+                _ => None,
+            }
+        })
+        .expect("bad protocol");
+
+    let mut port = match port::open_port(port_name, baudrate, force) {
         Ok(port) => port,
         Err(e) => {
             error!("Can't open port '{}': {}", port_name, e);
@@ -349,7 +456,7 @@ fn main() {
 
     if let (name, Some(sub_matches)) = matches.subcommand() {
         let cmd = cmds.get(name).unwrap();
-        match cmd(sub_matches, &mut port, Protocol::V1, retries, fmt) {
+        match cmd(sub_matches, port.as_mut(), proto.as_ref(), retries, fmt) {
             Ok(s) => println!("{}", s),
             Err(e) => error!("{}", e),
         }

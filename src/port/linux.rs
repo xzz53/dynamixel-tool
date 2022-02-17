@@ -3,7 +3,7 @@ use super::Rs485;
 use anyhow::Result;
 use glob::glob;
 use nix::{ioctl_read_bad, ioctl_write_ptr_bad};
-pub use serialport::TTYPort as NativePort;
+use serialport::TTYPort as NativePort;
 use std::fs;
 use std::os::unix::io::AsRawFd;
 

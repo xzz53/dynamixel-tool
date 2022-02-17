@@ -1,6 +1,6 @@
 use super::{OpenPortError, Rs485};
 use anyhow::Result;
-pub use serialport::COMPort as NativePort;
+use serialport::COMPort as NativePort;
 use serialport::SerialPort;
 
 pub fn do_open_port(port_name: &str, baudrate: u32) -> Result<NativePort> {
