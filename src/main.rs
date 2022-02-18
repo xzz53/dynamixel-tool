@@ -2,7 +2,7 @@ mod port;
 mod protocol;
 
 use anyhow::Result;
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{Arg, ArgMatches, Command};
 use log::error;
 use serialport::SerialPort;
 use std::convert::TryInto;
@@ -236,177 +236,134 @@ fn main() {
     cmds.insert("write-uint32", cmd_write_uint32);
     cmds.insert("write-bytes", cmd_write_bytes);
 
-    let matches = App::new("Dynamixel test tool")
-        .setting(AppSettings::SubcommandRequiredElseHelp)
+    let matches = Command::new("Dynamixel test tool")
+        .subcommand_required(true)
+        .arg_required_else_help(true)
         .version(env!("CARGO_PKG_VERSION"))
         .about("Debug and configure dynamixel servos")
         .arg(
-            Arg::with_name("force")
-                .short("f")
+            Arg::new("force")
+                .short('f')
                 .long("force")
                 .help("skip sanity checks"),
         )
         .arg(
-            Arg::with_name("debug")
-                .short("d")
+            Arg::new("debug")
+                .short('d')
                 .long("debug")
                 .help("Enable debug output"),
         )
         .arg(
-            Arg::with_name("port")
-                .short("p")
+            Arg::new("port")
+                .short('p')
                 .long("port")
                 .default_value("auto")
                 .help("UART device or 'auto'"),
         )
         .arg(
-            Arg::with_name("baudrate")
-                .short("b")
+            Arg::new("baudrate")
+                .short('b')
                 .long("baudrate")
                 .default_value("1000000")
                 .help("UART baud rate"),
         )
         .arg(
-            Arg::with_name("retries")
-                .short("r")
+            Arg::new("retries")
+                .short('r')
                 .long("retries")
                 .default_value("0")
                 .help("Read/write retry count"),
         )
         .arg(
-            Arg::with_name("json")
-                .short("j")
+            Arg::new("json")
+                .short('j')
                 .long("json")
                 .help("Use json-formatted output"),
         )
         .arg(
-            Arg::with_name("protocol")
-                .short("P")
+            Arg::new("protocol")
+                .short('P')
                 .long("protocol")
                 .default_value("1")
                 .help("Dynamixel protocol version"),
         )
         .subcommand(
-            SubCommand::with_name("scan")
+            Command::new("scan")
                 .about("Scan for servos")
                 .arg(
-                    Arg::with_name("scan_start")
+                    Arg::new("scan_start")
                         .default_value("0")
                         .help("Minimal ID for scanning"),
                 )
                 .arg(
-                    Arg::with_name("scan_end")
+                    Arg::new("scan_end")
                         .default_value("253")
                         .help("Maximal ID for scanning"),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("read-uint8")
+            Command::new("read-uint8")
                 .visible_alias("readb")
                 .about("Read unsigned 8-bit integer")
-                .arg(Arg::with_name("id").required(true).help("Servo id"))
-                .arg(
-                    Arg::with_name("address")
-                        .required(true)
-                        .help("Register address"),
-                ),
+                .arg(Arg::new("id").required(true).help("Servo id"))
+                .arg(Arg::new("address").required(true).help("Register address")),
         )
         .subcommand(
-            SubCommand::with_name("read-uint16")
+            Command::new("read-uint16")
                 .visible_alias("readh")
                 .about("Read unsigned 16-bit integer")
-                .arg(Arg::with_name("id").required(true).help("Servo id"))
-                .arg(
-                    Arg::with_name("address")
-                        .required(true)
-                        .help("Register address"),
-                ),
+                .arg(Arg::new("id").required(true).help("Servo id"))
+                .arg(Arg::new("address").required(true).help("Register address")),
         )
         .subcommand(
-            SubCommand::with_name("read-uint32")
+            Command::new("read-uint32")
                 .visible_alias("readw")
                 .about("Read unsigned 32-bit integer")
-                .arg(Arg::with_name("id").required(true).help("Servo id"))
-                .arg(
-                    Arg::with_name("address")
-                        .required(true)
-                        .help("Register address"),
-                ),
+                .arg(Arg::new("id").required(true).help("Servo id"))
+                .arg(Arg::new("address").required(true).help("Register address")),
         )
         .subcommand(
-            SubCommand::with_name("read-bytes")
+            Command::new("read-bytes")
                 .visible_alias("reada")
                 .about("Read byte array")
-                .arg(Arg::with_name("id").required(true).help("Servo id"))
-                .arg(
-                    Arg::with_name("address")
-                        .required(true)
-                        .help("Register address"),
-                )
-                .arg(Arg::with_name("count").required(true).help("Byte count")),
+                .arg(Arg::new("id").required(true).help("Servo id"))
+                .arg(Arg::new("address").required(true).help("Register address"))
+                .arg(Arg::new("count").required(true).help("Byte count")),
         )
         .subcommand(
-            SubCommand::with_name("write-uint8")
+            Command::new("write-uint8")
                 .visible_alias("writeb")
                 .about("Write unsigned 8-bit integer")
-                .arg(Arg::with_name("id").required(true).help("Servo id"))
-                .arg(
-                    Arg::with_name("address")
-                        .required(true)
-                        .help("Register address"),
-                )
-                .arg(
-                    Arg::with_name("value")
-                        .required(true)
-                        .help("Register value"),
-                ),
+                .arg(Arg::new("id").required(true).help("Servo id"))
+                .arg(Arg::new("address").required(true).help("Register address"))
+                .arg(Arg::new("value").required(true).help("Register value")),
         )
         .subcommand(
-            SubCommand::with_name("write-uint16")
+            Command::new("write-uint16")
                 .visible_alias("writeh")
                 .about("Write unsigned 16-bit integer")
-                .arg(Arg::with_name("id").required(true).help("Servo id"))
-                .arg(
-                    Arg::with_name("address")
-                        .required(true)
-                        .help("Register address"),
-                )
-                .arg(
-                    Arg::with_name("value")
-                        .required(true)
-                        .help("Register value"),
-                ),
+                .arg(Arg::new("id").required(true).help("Servo id"))
+                .arg(Arg::new("address").required(true).help("Register address"))
+                .arg(Arg::new("value").required(true).help("Register value")),
         )
         .subcommand(
-            SubCommand::with_name("write-uint32")
+            Command::new("write-uint32")
                 .visible_alias("writew")
                 .about("Write unsigned 32-bit integer")
-                .arg(Arg::with_name("id").required(true).help("Servo id"))
-                .arg(
-                    Arg::with_name("address")
-                        .required(true)
-                        .help("Register address"),
-                )
-                .arg(
-                    Arg::with_name("value")
-                        .required(true)
-                        .help("Register value"),
-                ),
+                .arg(Arg::new("id").required(true).help("Servo id"))
+                .arg(Arg::new("address").required(true).help("Register address"))
+                .arg(Arg::new("value").required(true).help("Register value")),
         )
         .subcommand(
-            SubCommand::with_name("write-bytes")
+            Command::new("write-bytes")
                 .visible_alias("writea")
                 .about("Write byte array")
-                .arg(Arg::with_name("id").required(true).help("Servo id"))
+                .arg(Arg::new("id").required(true).help("Servo id"))
+                .arg(Arg::new("address").required(true).help("Register address"))
                 .arg(
-                    Arg::with_name("address")
+                    Arg::new("values")
                         .required(true)
-                        .help("Register address"),
-                )
-                .arg(
-                    Arg::with_name("values")
-                        .required(true)
-                        .multiple(true)
+                        .multiple_values(true)
                         .help("Values to write"),
                 ),
         )
@@ -462,7 +419,7 @@ fn main() {
         }
     };
 
-    if let (name, Some(sub_matches)) = matches.subcommand() {
+    if let Some((name, sub_matches)) = matches.subcommand() {
         let cmd = cmds.get(name).unwrap();
         match cmd(sub_matches, port.as_mut(), proto.as_ref(), retries, fmt) {
             Ok(s) => println!("{}", s),
