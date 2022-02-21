@@ -98,15 +98,14 @@ fn encode_instruction_v1(buffer: &mut [u8], id: u8, instruction: u8, params: &[u
     6 + params.len()
 }
 
-// TODO: check error code
-fn decode_status_v1(buffer: &[u8], params: &mut [u8]) -> Option<usize> {
+fn decode_status_v1(buffer: &[u8], params: &mut [u8]) -> Result<usize> {
     if buffer.len() < 6 {
-        return None;
+        return Err(ProtocolError::BadPacket.into());
     }
 
     let param_length: usize = (buffer[3] - 2).into();
     if buffer.len() < (6 + param_length) || buffer[0..2] != [0xFF, 0xFF] {
-        return None;
+        return Err(ProtocolError::BadPacket.into());
     }
 
     let csum = buffer[2..5 + param_length]
@@ -115,12 +114,16 @@ fn decode_status_v1(buffer: &[u8], params: &mut [u8]) -> Option<usize> {
         .fold(0u8, |x, y| x.overflowing_add(y).0);
 
     if csum != !buffer[5 + param_length] || buffer[4] != 0x0 {
-        return None;
+        return Err(ProtocolError::BadPacket.into());
+    }
+
+    if buffer[4] != 0 {
+        return Err(ProtocolError::StatusError(buffer[4]).into());
     }
 
     params[..param_length].copy_from_slice(&buffer[5..5 + param_length]);
 
-    Some(6 + param_length)
+    Ok(6 + param_length)
 }
 
 fn ping_v1(port: &mut dyn SerialPort, id: u8) -> Result<()> {
@@ -137,9 +140,7 @@ fn ping_v1(port: &mut dyn SerialPort, id: u8) -> Result<()> {
     port.read_exact(&mut buffer[0..len_read])?;
     debug!("recv {:?}", &buffer[0..len_read]);
 
-    decode_status_v1(&buffer, &mut params)
-        .map(|_| ())
-        .ok_or_else(|| ProtocolError::BadPacket.into())
+    decode_status_v1(&buffer, &mut params).map(|_| Ok(()))?
 }
 
 fn read_v1(port: &mut dyn SerialPort, id: u8, address: u8, count: u8) -> Result<Vec<u8>> {
@@ -156,10 +157,7 @@ fn read_v1(port: &mut dyn SerialPort, id: u8, address: u8, count: u8) -> Result<
     port.read_exact(&mut buffer[0..len_read])?;
     debug!("recv {:?}", &buffer[0..len_read]);
 
-    match decode_status_v1(&buffer, &mut params) {
-        Some(_) => Ok(params[0..count.into()].to_vec()),
-        None => Err(ProtocolError::BadPacket.into()),
-    }
+    decode_status_v1(&buffer, &mut params).map(|_| Ok(params[0..count.into()].to_vec()))?
 }
 
 fn write_v1(port: &mut dyn SerialPort, id: u8, address: u8, data: &[u8]) -> Result<()> {
@@ -180,7 +178,5 @@ fn write_v1(port: &mut dyn SerialPort, id: u8, address: u8, data: &[u8]) -> Resu
     port.read_exact(&mut buffer[0..len_read])?;
     debug!("recv {:?}", &buffer[0..len_read]);
 
-    decode_status_v1(&buffer, &mut params)
-        .ok_or_else(|| ProtocolError::BadPacket.into())
-        .map(|_| ())
+    decode_status_v1(&buffer, &mut params).map(|_| Ok(()))?
 }

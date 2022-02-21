@@ -16,6 +16,8 @@ pub enum ProtocolError {
     InvalidAddress,
     #[error("invalid byte count for chosen protocol")]
     InvalidCount,
+    #[error("dynamixel status error {0}")]
+    StatusError(u8),
 }
 
 pub trait Protocol {
