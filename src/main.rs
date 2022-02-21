@@ -6,8 +6,8 @@ use anyhow::Result;
 use log::error;
 use nix::libc::EXIT_FAILURE;
 use serialport::SerialPort;
-use std::convert::TryInto;
 use std::process;
+use std::{convert::TryInto, fmt::Display};
 
 use cli::{Cli, StructOpt};
 use protocol::{Protocol, ProtocolV1, ProtocolV2};
@@ -15,6 +15,16 @@ use protocol::{Protocol, ProtocolV1, ProtocolV2};
 enum OutputFormat {
     Plain,
     Json,
+}
+
+fn slice_to_line<T>(data: &[T]) -> String
+where
+    T: Display,
+{
+    data.iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<String>>()
+        .join(" ")
 }
 
 fn cmd_scan(
@@ -38,52 +48,94 @@ fn cmd_scan(
 }
 
 fn cmd_read_uint8(
-    id: u8,
+    ids: &[u8],
     address: u16,
     port: &mut dyn SerialPort,
     proto: &dyn Protocol,
     retries: usize,
-    _fmt: OutputFormat,
+    fmt: OutputFormat,
 ) -> Result<String> {
-    proto
-        .read(port, retries, id, address, 1)
-        .map(|bytes| format!("{}", bytes[0]))
+    let res = ids
+        .iter()
+        .map(|&id| {
+            proto
+                .read(port, retries, id, address, 1)
+                .map(|bytes| bytes[0])
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(match fmt {
+        OutputFormat::Plain => slice_to_line(res.as_slice()),
+        OutputFormat::Json => {
+            if res.len() > 1 {
+                json::stringify(res)
+            } else {
+                res[0].to_string()
+            }
+        }
+    })
 }
 
 fn cmd_read_uint16(
-    id: u8,
+    ids: &[u8],
     address: u16,
     port: &mut dyn SerialPort,
     proto: &dyn Protocol,
     retries: usize,
-    _fmt: OutputFormat,
+    fmt: OutputFormat,
 ) -> Result<String> {
-    proto.read(port, retries, id, address, 2).map(|bytes| {
-        format!(
-            "{}",
-            u16::from_le_bytes(bytes.as_slice().try_into().unwrap())
-        )
+    let res = ids
+        .iter()
+        .map(|&id| {
+            proto
+                .read(port, retries, id, address, 2)
+                .map(|bytes| u16::from_le_bytes(bytes.as_slice().try_into().unwrap()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(match fmt {
+        OutputFormat::Plain => slice_to_line(res.as_slice()),
+        OutputFormat::Json => {
+            if res.len() > 1 {
+                json::stringify(res)
+            } else {
+                res[0].to_string()
+            }
+        }
     })
 }
 
 fn cmd_read_uint32(
-    id: u8,
+    ids: &[u8],
     address: u16,
     port: &mut dyn SerialPort,
     proto: &dyn Protocol,
     retries: usize,
-    _fmt: OutputFormat,
+    fmt: OutputFormat,
 ) -> Result<String> {
-    proto.read(port, retries, id, address, 4).map(|bytes| {
-        format!(
-            "{}",
-            u32::from_le_bytes(bytes.as_slice().try_into().unwrap())
-        )
+    let res = ids
+        .iter()
+        .map(|&id| {
+            proto
+                .read(port, retries, id, address, 4)
+                .map(|bytes| u32::from_le_bytes(bytes.as_slice().try_into().unwrap()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(match fmt {
+        OutputFormat::Plain => slice_to_line(res.as_slice()),
+        OutputFormat::Json => {
+            if res.len() > 1 {
+                json::stringify(res)
+            } else {
+                res[0].to_string()
+            }
+        }
     })
 }
 
 fn cmd_read_bytes(
-    id: u8,
+    ids: &[u8],
     address: u16,
     count: u16,
     port: &mut dyn SerialPort,
@@ -91,20 +143,29 @@ fn cmd_read_bytes(
     retries: usize,
     fmt: OutputFormat,
 ) -> Result<String> {
-    proto
-        .read(port, retries, id, address, count)
-        .map(|ids| match fmt {
-            OutputFormat::Plain => ids
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<String>>()
-                .join("\n"),
-            OutputFormat::Json => json::stringify(ids),
-        })
+    let res = ids
+        .iter()
+        .map(|&id| proto.read(port, retries, id, address, count))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(match fmt {
+        OutputFormat::Plain => res
+            .iter()
+            .map(|x| slice_to_line(x.as_slice()))
+            .collect::<Vec<String>>()
+            .join("\n"),
+        OutputFormat::Json => {
+            if res.len() > 1 {
+                json::stringify(res)
+            } else {
+                json::stringify(res[0].clone())
+            }
+        }
+    })
 }
 
 fn cmd_write_uint8(
-    id: u8,
+    ids: &[u8],
     address: u16,
     value: u8,
     port: &mut dyn SerialPort,
@@ -112,13 +173,14 @@ fn cmd_write_uint8(
     retries: usize,
     _fmt: OutputFormat,
 ) -> Result<String> {
-    proto
-        .write(port, retries, id, address, &[value])
-        .map(|_| String::new())
+    ids.iter()
+        .map(|&id| proto.write(port, retries, id, address, &[value]))
+        .collect::<Result<Vec<_>, _>>()
+        .map(|_| Ok(String::new()))?
 }
 
 fn cmd_write_uint16(
-    id: u8,
+    ids: &[u8],
     address: u16,
     value: u16,
     port: &mut dyn SerialPort,
@@ -126,13 +188,14 @@ fn cmd_write_uint16(
     retries: usize,
     _fmt: OutputFormat,
 ) -> Result<String> {
-    proto
-        .write(port, retries, id, address, &value.to_le_bytes())
-        .map(|_| String::new())
+    ids.iter()
+        .map(|&id| proto.write(port, retries, id, address, &value.to_le_bytes()))
+        .collect::<Result<Vec<_>, _>>()
+        .map(|_| Ok(String::new()))?
 }
 
 fn cmd_write_uint32(
-    id: u8,
+    ids: &[u8],
     address: u16,
     value: u32,
     port: &mut dyn SerialPort,
@@ -140,13 +203,14 @@ fn cmd_write_uint32(
     retries: usize,
     _fmt: OutputFormat,
 ) -> Result<String> {
-    proto
-        .write(port, retries, id, address, &value.to_le_bytes())
-        .map(|_| String::new())
+    ids.iter()
+        .map(|&id| proto.write(port, retries, id, address, &value.to_le_bytes()))
+        .collect::<Result<Vec<_>, _>>()
+        .map(|_| Ok(String::new()))?
 }
 
 fn cmd_write_bytes(
-    id: u8,
+    ids: &[u8],
     address: u16,
     values: &[u8],
     port: &mut dyn SerialPort,
@@ -154,9 +218,10 @@ fn cmd_write_bytes(
     retries: usize,
     _fmt: OutputFormat,
 ) -> Result<String> {
-    proto
-        .write(port, retries, id, address, values)
-        .map(|_| String::new())
+    ids.iter()
+        .map(|&id| proto.write(port, retries, id, address, values))
+        .collect::<Result<Vec<_>, _>>()
+        .map(|_| Ok(String::new()))?
 }
 
 fn main() {
@@ -198,14 +263,6 @@ fn main() {
         }
     };
 
-    // if let Some((name, sub_matches)) = matches.subcommand() {
-    //     let cmd = cmds.get(name).unwrap();
-    //     match cmd(sub_matches, port.as_mut(), proto.as_ref(), retries, fmt) {
-    //         Ok(s) => println!("{}", s),
-    //         Err(e) => error!("{}", e),
-    //     }
-    // }
-
     match match cli.command {
         cli::Commands::Scan {
             scan_start,
@@ -218,17 +275,36 @@ fn main() {
             retries,
             fmt,
         ),
-        cli::Commands::ReadUint8 { id, address } => {
-            cmd_read_uint8(id, address, port.as_mut(), proto.as_ref(), retries, fmt)
-        }
-        cli::Commands::ReadUint16 { id, address } => {
-            cmd_read_uint16(id, address, port.as_mut(), proto.as_ref(), retries, fmt)
-        }
-        cli::Commands::ReadUint32 { id, address } => {
-            cmd_read_uint32(id, address, port.as_mut(), proto.as_ref(), retries, fmt)
-        }
-        cli::Commands::ReadBytes { id, address, count } => cmd_read_bytes(
-            id,
+        cli::Commands::ReadUint8 { ids, address } => cmd_read_uint8(
+            ids.as_slice(),
+            address,
+            port.as_mut(),
+            proto.as_ref(),
+            retries,
+            fmt,
+        ),
+        cli::Commands::ReadUint16 { ids, address } => cmd_read_uint16(
+            ids.as_slice(),
+            address,
+            port.as_mut(),
+            proto.as_ref(),
+            retries,
+            fmt,
+        ),
+        cli::Commands::ReadUint32 { ids, address } => cmd_read_uint32(
+            ids.as_slice(),
+            address,
+            port.as_mut(),
+            proto.as_ref(),
+            retries,
+            fmt,
+        ),
+        cli::Commands::ReadBytes {
+            ids,
+            address,
+            count,
+        } => cmd_read_bytes(
+            ids.as_slice(),
             address,
             count,
             port.as_mut(),
@@ -236,8 +312,12 @@ fn main() {
             retries,
             fmt,
         ),
-        cli::Commands::WriteUint8 { id, address, value } => cmd_write_uint8(
-            id,
+        cli::Commands::WriteUint8 {
+            ids,
+            address,
+            value,
+        } => cmd_write_uint8(
+            ids.as_slice(),
             address,
             value,
             port.as_mut(),
@@ -245,8 +325,12 @@ fn main() {
             retries,
             fmt,
         ),
-        cli::Commands::WriteUint16 { id, address, value } => cmd_write_uint16(
-            id,
+        cli::Commands::WriteUint16 {
+            ids,
+            address,
+            value,
+        } => cmd_write_uint16(
+            ids.as_slice(),
             address,
             value,
             port.as_mut(),
@@ -254,8 +338,12 @@ fn main() {
             retries,
             fmt,
         ),
-        cli::Commands::WriteUint32 { id, address, value } => cmd_write_uint32(
-            id,
+        cli::Commands::WriteUint32 {
+            ids,
+            address,
+            value,
+        } => cmd_write_uint32(
+            ids.as_slice(),
             address,
             value,
             port.as_mut(),
@@ -264,11 +352,11 @@ fn main() {
             fmt,
         ),
         cli::Commands::WriteBytes {
-            id,
+            ids,
             address,
             values,
         } => cmd_write_bytes(
-            id,
+            ids.as_slice(),
             address,
             &values,
             port.as_mut(),
