@@ -88,6 +88,7 @@ fn encode_instruction_v2(buffer: &mut [u8], id: u8, instruction: u8, params: &[u
     10 + params.len()
 }
 
+// TODO: check error code
 fn decode_status_v2(buffer: &[u8], params: &mut [u8]) -> Option<usize> {
     if buffer.len() < 10 {
         return None;
