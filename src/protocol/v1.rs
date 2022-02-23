@@ -1,20 +1,23 @@
-use super::{Protocol, ProtocolError, Result, SerialPort};
+use super::{Protocol, ProtocolError, ProtocolVersion, Result, SerialPort};
 use log::debug;
 
-pub struct ProtocolV1 {}
+pub struct ProtocolV1 {
+    port: Box<dyn SerialPort>,
+    retries: usize,
+}
+
+impl ProtocolV1 {
+    pub fn new(port: Box<dyn SerialPort>, retries: usize) -> Self {
+        Self { port, retries }
+    }
+}
 
 impl Protocol for ProtocolV1 {
-    fn scan(
-        &self,
-        port: &mut dyn SerialPort,
-        retries: usize,
-        scan_start: u8,
-        scan_end: u8,
-    ) -> Result<Vec<u8>> {
+    fn scan(&mut self, scan_start: u8, scan_end: u8) -> Result<Vec<u8>> {
         let mut result: Vec<u8> = Vec::new();
         (scan_start..scan_end).into_iter().for_each(|id| {
-            for _ in 0..=retries {
-                if ping_v1(port, id).is_ok() {
+            for _ in 0..=self.retries {
+                if ping_v1(self.port.as_mut(), id).is_ok() {
                     result.push(id);
                     break;
                 }
@@ -23,14 +26,7 @@ impl Protocol for ProtocolV1 {
         Ok(result)
     }
 
-    fn read(
-        &self,
-        port: &mut dyn SerialPort,
-        retries: usize,
-        id: u8,
-        address: u16,
-        count: u16,
-    ) -> Result<Vec<u8>> {
+    fn read(&mut self, id: u8, address: u16, count: u16) -> Result<Vec<u8>> {
         if address > 0xFE {
             return Err(ProtocolError::InvalidAddress.into());
         }
@@ -41,8 +37,8 @@ impl Protocol for ProtocolV1 {
 
         let mut error = None;
 
-        for _ in 0..=retries {
-            match read_v1(port, id, address as u8, count as u8) {
+        for _ in 0..=self.retries {
+            match read_v1(self.port.as_mut(), id, address as u8, count as u8) {
                 Ok(data) => return Ok(data),
                 Err(e) => error = Some(e),
             }
@@ -50,28 +46,25 @@ impl Protocol for ProtocolV1 {
         Err(error.unwrap())
     }
 
-    fn write(
-        &self,
-        port: &mut dyn SerialPort,
-        retries: usize,
-        id: u8,
-        address: u16,
-        data: &[u8],
-    ) -> anyhow::Result<()> {
+    fn write(&mut self, id: u8, address: u16, data: &[u8]) -> anyhow::Result<()> {
         let mut error = None;
 
         if address > 0xFF {
             return Err(ProtocolError::InvalidCount.into());
         }
 
-        for _ in 0..=retries {
-            match write_v1(port, id, address as u8, data) {
+        for _ in 0..=self.retries {
+            match write_v1(self.port.as_mut(), id, address as u8, data) {
                 Ok(data) => return Ok(data),
                 Err(e) => error = Some(e),
             }
         }
 
         Err(error.unwrap())
+    }
+
+    fn version(&self) -> ProtocolVersion {
+        super::ProtocolVersion::V1
     }
 }
 

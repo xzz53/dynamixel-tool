@@ -8,6 +8,9 @@ use std::ops::Deref;
 use std::str::FromStr;
 use thiserror::Error;
 
+use crate::protocol::ProtocolVersion;
+use crate::regs::RegSpec;
+
 #[derive(Error, Debug)]
 pub enum RangeError {
     #[error("invalid range '{0}'")]
@@ -99,7 +102,7 @@ pub struct Cli {
 
     /// Dynamixel protocol version
     #[clap(long, short = 'P', default_value = "1")]
-    pub protocol: String,
+    pub protocol: ProtocolVersion,
 
     #[clap(subcommand)]
     pub command: Commands,
@@ -107,6 +110,12 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    /// List known device models
+    ListModels,
+
+    /// List registers for a model
+    ListRegisters { model: String },
+
     /// Scan for servos
     Scan {
         #[clap(default_value_t = 0)]
@@ -134,6 +143,9 @@ pub enum Commands {
         address: u16,
         count: u16,
     },
+
+    /// Read register
+    ReadReg { ids: IdRange, reg: RegSpec },
 
     /// Write unsigned 8-bit integer
     #[clap(visible_alias = "writeb")]
@@ -166,5 +178,12 @@ pub enum Commands {
         address: u16,
         #[clap(required = true)]
         values: Vec<u8>,
+    },
+
+    /// Write register
+    WriteReg {
+        ids: IdRange,
+        reg: RegSpec,
+        value: u32,
     },
 }

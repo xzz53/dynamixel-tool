@@ -1,22 +1,25 @@
-use super::{Protocol, ProtocolError, Result, SerialPort};
+use super::{Protocol, ProtocolError, ProtocolVersion, Result, SerialPort};
 use crc::{self, Crc, CRC_16_UMTS};
 use log::debug;
 use std::convert::TryInto;
 
-pub struct ProtocolV2 {}
+pub struct ProtocolV2 {
+    port: Box<dyn SerialPort>,
+    retries: usize,
+}
+
+impl ProtocolV2 {
+    pub fn new(port: Box<dyn SerialPort>, retries: usize) -> Self {
+        Self { port, retries }
+    }
+}
 
 impl Protocol for ProtocolV2 {
-    fn scan(
-        &self,
-        port: &mut dyn SerialPort,
-        retries: usize,
-        scan_start: u8,
-        scan_end: u8,
-    ) -> Result<Vec<u8>> {
+    fn scan(&mut self, scan_start: u8, scan_end: u8) -> Result<Vec<u8>> {
         let mut result: Vec<u8> = Vec::new();
         (scan_start..scan_end).into_iter().for_each(|id| {
-            for _ in 0..=retries {
-                if ping(port, id).is_ok() {
+            for _ in 0..=self.retries {
+                if ping(self.port.as_mut(), id).is_ok() {
                     result.push(id);
                     break;
                 }
@@ -25,17 +28,10 @@ impl Protocol for ProtocolV2 {
         Ok(result)
     }
 
-    fn read(
-        &self,
-        port: &mut dyn SerialPort,
-        retries: usize,
-        id: u8,
-        address: u16,
-        count: u16,
-    ) -> Result<Vec<u8>> {
+    fn read(&mut self, id: u8, address: u16, count: u16) -> Result<Vec<u8>> {
         let mut error = None;
-        for _ in 0..=retries {
-            match read1(port, id, address, count) {
+        for _ in 0..=self.retries {
+            match read1(self.port.as_mut(), id, address, count) {
                 Ok(data) => return Ok(data),
                 Err(e) => error = Some(e),
             }
@@ -43,23 +39,20 @@ impl Protocol for ProtocolV2 {
         Err(error.unwrap())
     }
 
-    fn write(
-        &self,
-        port: &mut dyn SerialPort,
-        retries: usize,
-        id: u8,
-        address: u16,
-        data: &[u8],
-    ) -> Result<()> {
+    fn write(&mut self, id: u8, address: u16, data: &[u8]) -> Result<()> {
         let mut error = None;
 
-        for _ in 0..=retries {
-            match write1(port, id, address, data) {
+        for _ in 0..=self.retries {
+            match write1(self.port.as_mut(), id, address, data) {
                 Ok(data) => return Ok(data),
                 Err(e) => error = Some(e),
             }
         }
         Err(error.unwrap())
+    }
+
+    fn version(&self) -> ProtocolVersion {
+        super::ProtocolVersion::V2
     }
 }
 

@@ -1,16 +1,17 @@
 mod cli;
 mod port;
 mod protocol;
+mod regs;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::error;
 use nix::libc::EXIT_FAILURE;
-use serialport::SerialPort;
+use regs::RegSpec;
 use std::process;
-use std::{convert::TryInto, fmt::Display};
+use std::{convert::TryFrom, convert::TryInto, fmt::Display};
 
 use cli::{Cli, StructOpt};
-use protocol::{Protocol, ProtocolV1, ProtocolV2};
+use protocol::{Protocol, ProtocolVersion};
 
 enum OutputFormat {
     Plain,
@@ -27,41 +28,60 @@ where
         .join(" ")
 }
 
+fn slice_to_column<T>(data: &[T]) -> String
+where
+    T: Display,
+{
+    data.iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
+fn cmd_list_models(proto: ProtocolVersion, fmt: OutputFormat) -> Result<String> {
+    let models = regs::list_models(proto);
+    Ok(match fmt {
+        OutputFormat::Plain => slice_to_column(models.as_slice()),
+        OutputFormat::Json => json::stringify(models),
+    })
+}
+
+fn cmd_list_registers(proto: ProtocolVersion, model: &str, _fmt: OutputFormat) -> Result<String> {
+    let regs = regs::list_registers(proto, model);
+
+    if !regs.is_empty() {
+        Ok(slice_to_column(
+            regs.iter()
+                .map(|reg| reg.to_string())
+                .collect::<Vec<_>>()
+                .as_slice(),
+        ))
+    } else {
+        Err(anyhow!("Model {} not found (protocol {})", model, proto))
+    }
+}
+
 fn cmd_scan(
+    proto: &mut dyn Protocol,
     scan_start: u8,
     scan_end: u8,
-    port: &mut dyn SerialPort,
-    proto: &dyn Protocol,
-    retries: usize,
     fmt: OutputFormat,
 ) -> Result<String> {
-    proto
-        .scan(port, retries, scan_start, scan_end)
-        .map(|ids| match fmt {
-            OutputFormat::Plain => ids
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<String>>()
-                .join("\n"),
-            OutputFormat::Json => json::stringify(ids),
-        })
+    proto.scan(scan_start, scan_end).map(|ids| match fmt {
+        OutputFormat::Plain => slice_to_column(&ids),
+        OutputFormat::Json => json::stringify(ids),
+    })
 }
 
 fn cmd_read_uint8(
+    proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
-    port: &mut dyn SerialPort,
-    proto: &dyn Protocol,
-    retries: usize,
     fmt: OutputFormat,
 ) -> Result<String> {
     let res = ids
         .iter()
-        .map(|&id| {
-            proto
-                .read(port, retries, id, address, 1)
-                .map(|bytes| bytes[0])
-        })
+        .map(|&id| proto.read(id, address, 1).map(|bytes| bytes[0]))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(match fmt {
@@ -77,18 +97,16 @@ fn cmd_read_uint8(
 }
 
 fn cmd_read_uint16(
+    proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
-    port: &mut dyn SerialPort,
-    proto: &dyn Protocol,
-    retries: usize,
     fmt: OutputFormat,
 ) -> Result<String> {
     let res = ids
         .iter()
         .map(|&id| {
             proto
-                .read(port, retries, id, address, 2)
+                .read(id, address, 2)
                 .map(|bytes| u16::from_le_bytes(bytes.as_slice().try_into().unwrap()))
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -106,18 +124,16 @@ fn cmd_read_uint16(
 }
 
 fn cmd_read_uint32(
+    proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
-    port: &mut dyn SerialPort,
-    proto: &dyn Protocol,
-    retries: usize,
     fmt: OutputFormat,
 ) -> Result<String> {
     let res = ids
         .iter()
         .map(|&id| {
             proto
-                .read(port, retries, id, address, 4)
+                .read(id, address, 4)
                 .map(|bytes| u32::from_le_bytes(bytes.as_slice().try_into().unwrap()))
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -135,17 +151,15 @@ fn cmd_read_uint32(
 }
 
 fn cmd_read_bytes(
+    proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
     count: u16,
-    port: &mut dyn SerialPort,
-    proto: &dyn Protocol,
-    retries: usize,
     fmt: OutputFormat,
 ) -> Result<String> {
     let res = ids
         .iter()
-        .map(|&id| proto.read(port, retries, id, address, count))
+        .map(|&id| proto.read(id, address, count))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(match fmt {
@@ -164,62 +178,104 @@ fn cmd_read_bytes(
     })
 }
 
+fn cmd_read_reg(
+    proto: &mut dyn Protocol,
+    ids: &[u8],
+    regspec: RegSpec,
+    fmt: OutputFormat,
+) -> Result<String> {
+    let reg = regs::find_register(proto.version(), regspec).ok_or(anyhow!("Register not found"))?;
+
+    let res = ids
+        .iter()
+        .map(|&id| -> Result<u32> {
+            let bytes: Vec<_> = proto.read(id, reg.address, reg.size as u16)?;
+            Ok(match reg.size {
+                regs::RegSize::Byte => u8::from_le_bytes(bytes[0..=0].try_into().unwrap()) as u32,
+                regs::RegSize::Half => u16::from_le_bytes(bytes[0..=1].try_into().unwrap()) as u32,
+                regs::RegSize::Word => u32::from_le_bytes(bytes[0..=3].try_into().unwrap()),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(match fmt {
+        OutputFormat::Plain => slice_to_line(res.as_slice()),
+        OutputFormat::Json => {
+            if res.len() > 1 {
+                json::stringify(res)
+            } else {
+                res[0].to_string()
+            }
+        }
+    })
+}
+
 fn cmd_write_uint8(
+    proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
     value: u8,
-    port: &mut dyn SerialPort,
-    proto: &dyn Protocol,
-    retries: usize,
-    _fmt: OutputFormat,
 ) -> Result<String> {
     ids.iter()
-        .map(|&id| proto.write(port, retries, id, address, &[value]))
+        .map(|&id| proto.write(id, address, &[value]))
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
 }
 
 fn cmd_write_uint16(
+    proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
     value: u16,
-    port: &mut dyn SerialPort,
-    proto: &dyn Protocol,
-    retries: usize,
-    _fmt: OutputFormat,
 ) -> Result<String> {
     ids.iter()
-        .map(|&id| proto.write(port, retries, id, address, &value.to_le_bytes()))
+        .map(|&id| proto.write(id, address, &value.to_le_bytes()))
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
 }
 
 fn cmd_write_uint32(
+    proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
     value: u32,
-    port: &mut dyn SerialPort,
-    proto: &dyn Protocol,
-    retries: usize,
-    _fmt: OutputFormat,
 ) -> Result<String> {
     ids.iter()
-        .map(|&id| proto.write(port, retries, id, address, &value.to_le_bytes()))
+        .map(|&id| proto.write(id, address, &value.to_le_bytes()))
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
 }
 
 fn cmd_write_bytes(
+    proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
     values: &[u8],
-    port: &mut dyn SerialPort,
-    proto: &dyn Protocol,
-    retries: usize,
-    _fmt: OutputFormat,
 ) -> Result<String> {
     ids.iter()
-        .map(|&id| proto.write(port, retries, id, address, values))
+        .map(|&id| proto.write(id, address, values))
+        .collect::<Result<Vec<_>, _>>()
+        .map(|_| Ok(String::new()))?
+}
+
+fn cmd_write_reg(
+    proto: &mut dyn Protocol,
+    ids: &[u8],
+    regspec: RegSpec,
+    value: u32,
+) -> Result<String> {
+    let reg = regs::find_register(proto.version(), regspec).ok_or(anyhow!("Register not found"))?;
+
+    ids.iter()
+        .map(|&id| match reg.size {
+            regs::RegSize::Byte => {
+                proto.write(id, reg.address, &u8::try_from(value)?.to_le_bytes())
+            }
+            regs::RegSize::Half => {
+                proto.write(id, reg.address, &u16::try_from(value)?.to_le_bytes())
+            }
+            regs::RegSize::Word => proto.write(id, reg.address, &value.to_le_bytes()),
+        })
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
 }
@@ -242,20 +298,7 @@ fn main() {
         OutputFormat::Plain
     };
 
-    let force = cli.force;
-    let baudrate = cli.baudrate;
-    let retries = cli.retries;
-
-    let proto: Box<dyn Protocol> = match cli.protocol.as_ref() {
-        "1" => Box::new(ProtocolV1 {}),
-        "2" => Box::new(ProtocolV2 {}),
-        _ => {
-            error!("unknown protocol {}", cli.protocol);
-            process::exit(EXIT_FAILURE);
-        }
-    };
-
-    let mut port = match port::open_port(&cli.port, baudrate, force) {
+    let port = match port::open_port(&cli.port, cli.baudrate, cli.force) {
         Ok(port) => port,
         Err(e) => {
             error!("Can't open port '{}': {}", cli.port, e);
@@ -263,107 +306,46 @@ fn main() {
         }
     };
 
+    let mut proto_box = protocol::make_protocol(cli.protocol, port, cli.retries);
+    let proto = proto_box.as_mut();
+
     match match cli.command {
+        cli::Commands::ListModels => cmd_list_models(cli.protocol, fmt),
+        cli::Commands::ListRegisters { model } => cmd_list_registers(cli.protocol, &model, fmt),
         cli::Commands::Scan {
             scan_start,
             scan_end,
-        } => cmd_scan(
-            scan_start,
-            scan_end,
-            port.as_mut(),
-            proto.as_ref(),
-            retries,
-            fmt,
-        ),
-        cli::Commands::ReadUint8 { ids, address } => cmd_read_uint8(
-            ids.as_slice(),
-            address,
-            port.as_mut(),
-            proto.as_ref(),
-            retries,
-            fmt,
-        ),
-        cli::Commands::ReadUint16 { ids, address } => cmd_read_uint16(
-            ids.as_slice(),
-            address,
-            port.as_mut(),
-            proto.as_ref(),
-            retries,
-            fmt,
-        ),
-        cli::Commands::ReadUint32 { ids, address } => cmd_read_uint32(
-            ids.as_slice(),
-            address,
-            port.as_mut(),
-            proto.as_ref(),
-            retries,
-            fmt,
-        ),
+        } => cmd_scan(proto, scan_start, scan_end, fmt),
+        cli::Commands::ReadUint8 { ids, address } => cmd_read_uint8(proto, &ids, address, fmt),
+        cli::Commands::ReadUint16 { ids, address } => cmd_read_uint16(proto, &ids, address, fmt),
+        cli::Commands::ReadUint32 { ids, address } => cmd_read_uint32(proto, &ids, address, fmt),
         cli::Commands::ReadBytes {
             ids,
             address,
             count,
-        } => cmd_read_bytes(
-            ids.as_slice(),
-            address,
-            count,
-            port.as_mut(),
-            proto.as_ref(),
-            retries,
-            fmt,
-        ),
+        } => cmd_read_bytes(proto, &ids, address, count, fmt),
+        cli::Commands::ReadReg { ids, reg } => cmd_read_reg(proto, &ids, reg, fmt),
         cli::Commands::WriteUint8 {
             ids,
             address,
             value,
-        } => cmd_write_uint8(
-            ids.as_slice(),
-            address,
-            value,
-            port.as_mut(),
-            proto.as_ref(),
-            retries,
-            fmt,
-        ),
+        } => cmd_write_uint8(proto, &ids, address, value),
         cli::Commands::WriteUint16 {
             ids,
             address,
             value,
-        } => cmd_write_uint16(
-            ids.as_slice(),
-            address,
-            value,
-            port.as_mut(),
-            proto.as_ref(),
-            retries,
-            fmt,
-        ),
+        } => cmd_write_uint16(proto, &ids, address, value),
         cli::Commands::WriteUint32 {
             ids,
             address,
             value,
-        } => cmd_write_uint32(
-            ids.as_slice(),
-            address,
-            value,
-            port.as_mut(),
-            proto.as_ref(),
-            retries,
-            fmt,
-        ),
+        } => cmd_write_uint32(proto, &ids, address, value),
         cli::Commands::WriteBytes {
             ids,
             address,
             values,
-        } => cmd_write_bytes(
-            ids.as_slice(),
-            address,
-            &values,
-            port.as_mut(),
-            proto.as_ref(),
-            retries,
-            fmt,
-        ),
+        } => cmd_write_bytes(proto, &ids, address, &values),
+        cli::Commands::WriteReg { ids, reg, value } => cmd_write_reg(proto, &ids, reg, value),
     } {
         Ok(s) => {
             println!("{}", s)
