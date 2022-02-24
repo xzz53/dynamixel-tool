@@ -73,6 +73,20 @@ impl FromStr for IdRange {
     }
 }
 
+fn parse_with_radix<T>(input: &str) -> Result<T, T::FromStrRadixErr>
+where
+    T: num::Num,
+    <T as num::Num>::FromStrRadixErr: std::error::Error + Send + Sync,
+{
+    if input.starts_with("0x") {
+        T::from_str_radix(input.trim_start_matches("0x"), 16)
+    } else if input.starts_with("0b") {
+        T::from_str_radix(input.trim_start_matches("0b"), 2)
+    } else {
+        T::from_str_radix(input.trim_start_matches("0b"), 10)
+    }
+}
+
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 pub struct Cli {
@@ -118,29 +132,43 @@ pub enum Commands {
 
     /// Scan for servos
     Scan {
-        #[clap(default_value_t = 0)]
+        #[clap(default_value_t = 0, parse(try_from_str=parse_with_radix))]
         scan_start: u8,
-        #[clap(default_value_t = 253)]
+        #[clap(default_value_t = 253, parse(try_from_str=parse_with_radix))]
         scan_end: u8,
     },
 
     /// Read unsigned 8-bit integer
     #[clap(visible_alias = "readb")]
-    ReadUint8 { ids: IdRange, address: u16 },
+    ReadUint8 {
+        ids: IdRange,
+        #[clap(parse(try_from_str=parse_with_radix))]
+        address: u16,
+    },
 
     /// Read unsigned 16-bit integer
     #[clap(visible_alias = "readh")]
-    ReadUint16 { ids: IdRange, address: u16 },
+    ReadUint16 {
+        ids: IdRange,
+        #[clap(parse(try_from_str=parse_with_radix))]
+        address: u16,
+    },
 
     /// Read unsigned 32-bit integer
     #[clap(visible_alias = "readw")]
-    ReadUint32 { ids: IdRange, address: u16 },
+    ReadUint32 {
+        ids: IdRange,
+        #[clap(parse(try_from_str=parse_with_radix))]
+        address: u16,
+    },
 
     /// Read byte array
     #[clap(visible_alias = "reada")]
     ReadBytes {
         ids: IdRange,
+        #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
+        #[clap(parse(try_from_str=parse_with_radix))]
         count: u16,
     },
 
@@ -151,7 +179,9 @@ pub enum Commands {
     #[clap(visible_alias = "writeb")]
     WriteUint8 {
         ids: IdRange,
+        #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
+        #[clap(parse(try_from_str=parse_with_radix))]
         value: u8,
     },
 
@@ -159,7 +189,9 @@ pub enum Commands {
     #[clap(visible_alias = "writeh")]
     WriteUint16 {
         ids: IdRange,
+        #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
+        #[clap(parse(try_from_str=parse_with_radix))]
         value: u16,
     },
 
@@ -167,7 +199,9 @@ pub enum Commands {
     #[clap(visible_alias = "writew")]
     WriteUint32 {
         ids: IdRange,
+        #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
+        #[clap(parse(try_from_str=parse_with_radix))]
         value: u32,
     },
 
@@ -175,8 +209,9 @@ pub enum Commands {
     #[clap(visible_alias = "writea")]
     WriteBytes {
         ids: IdRange,
+        #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
-        #[clap(required = true)]
+        #[clap(required = true, parse(try_from_str=parse_with_radix))]
         values: Vec<u8>,
     },
 
