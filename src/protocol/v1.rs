@@ -50,7 +50,7 @@ impl Protocol for ProtocolV1 {
         let mut error = None;
 
         if address > 0xFF {
-            return Err(ProtocolError::InvalidCount.into());
+            return Err(ProtocolError::InvalidAddress.into());
         }
 
         for _ in 0..=self.retries {
