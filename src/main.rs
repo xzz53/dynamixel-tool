@@ -4,10 +4,10 @@ mod protocol;
 mod regs;
 
 use anyhow::{anyhow, Context, Result};
-use log::error;
-use nix::libc::EXIT_FAILURE;
+use clap::CommandFactory;
+use clap_complete::{generate, shells::Bash};
 use regs::RegSpec;
-use std::process;
+use std::io;
 use std::{convert::TryFrom, convert::TryInto, fmt::Display};
 
 use cli::{Cli, StructOpt};
@@ -309,8 +309,18 @@ fn cmd_write_reg(
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    if std::env::var("GENERATE_COMPLETION").is_ok() {
+        generate(
+            Bash,
+            &mut cli::Cli::command(),
+            "dynamixel-tool",
+            &mut io::stdout(),
+        );
 
+        return Ok(());
+    }
+
+    let cli = Cli::parse();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(if cli.debug {
         "debug"
     } else {
@@ -326,13 +336,7 @@ fn main() -> Result<()> {
         OutputFormat::Plain
     };
 
-    let port = match port::open_port(&cli.port, cli.baudrate, cli.force) {
-        Ok(port) => port,
-        Err(e) => {
-            error!("Can't open port '{}': {}", cli.port, e);
-            process::exit(EXIT_FAILURE);
-        }
-    };
+    let port = port::open_port(&cli.port, cli.baudrate, cli.force)?;
 
     let mut proto_box = protocol::make_protocol(cli.protocol, port, cli.retries);
     let proto = proto_box.as_mut();
