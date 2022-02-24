@@ -90,7 +90,7 @@ impl FromStr for RegSpec {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         lazy_static! {
-            static ref RE: Regex = Regex::new(r"^([-_[:alnum:]]+)::([-_[:alnum:]]+)$").unwrap();
+            static ref RE: Regex = Regex::new(r"^([-_[:alnum:]]+)/([-_[:alnum:]]+)$").unwrap();
         }
         if let Some(cap) = RE.captures(s) {
             Ok(RegSpec {
