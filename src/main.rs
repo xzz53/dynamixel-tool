@@ -3,7 +3,7 @@ mod port;
 mod protocol;
 mod regs;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use log::error;
 use nix::libc::EXIT_FAILURE;
 use regs::RegSpec;
@@ -81,7 +81,11 @@ fn cmd_read_uint8(
 ) -> Result<String> {
     let res = ids
         .iter()
-        .map(|&id| proto.read(id, address, 1).map(|bytes| bytes[0]))
+        .map(|&id| -> Result<u8> {
+            Ok(proto
+                .read(id, address, 1)
+                .with_context(|| format!("Failed to read uint8 from id {}", id))?[0])
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(match fmt {
@@ -104,10 +108,11 @@ fn cmd_read_uint16(
 ) -> Result<String> {
     let res = ids
         .iter()
-        .map(|&id| {
-            proto
+        .map(|&id| -> Result<u16> {
+            let bytes = proto
                 .read(id, address, 2)
-                .map(|bytes| u16::from_le_bytes(bytes.as_slice().try_into().unwrap()))
+                .with_context(|| format!("Failed to read uint16 from id {}", id))?;
+            Ok(u16::from_le_bytes(bytes.as_slice().try_into().unwrap()))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -131,10 +136,11 @@ fn cmd_read_uint32(
 ) -> Result<String> {
     let res = ids
         .iter()
-        .map(|&id| {
-            proto
+        .map(|&id| -> Result<u32> {
+            let bytes = proto
                 .read(id, address, 4)
-                .map(|bytes| u32::from_le_bytes(bytes.as_slice().try_into().unwrap()))
+                .with_context(|| format!("Failed to read uint32 from id {}", id))?;
+            Ok(u32::from_le_bytes(bytes.as_slice().try_into().unwrap()))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -159,7 +165,11 @@ fn cmd_read_bytes(
 ) -> Result<String> {
     let res = ids
         .iter()
-        .map(|&id| proto.read(id, address, count))
+        .map(|&id| -> Result<Vec<u8>> {
+            proto
+                .read(id, address, count)
+                .with_context(|| format!("Failed to read bytes from id {}", id))
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(match fmt {
@@ -189,7 +199,9 @@ fn cmd_read_reg(
     let res = ids
         .iter()
         .map(|&id| -> Result<u32> {
-            let bytes: Vec<_> = proto.read(id, reg.address, reg.size as u16)?;
+            let bytes: Vec<_> = proto
+                .read(id, reg.address, reg.size as u16)
+                .with_context(|| format!("Failed to read register from id {}", id))?;
             Ok(match reg.size {
                 regs::RegSize::Byte => u8::from_le_bytes(bytes[0..=0].try_into().unwrap()) as u32,
                 regs::RegSize::Half => u16::from_le_bytes(bytes[0..=1].try_into().unwrap()) as u32,
@@ -217,7 +229,11 @@ fn cmd_write_uint8(
     value: u8,
 ) -> Result<String> {
     ids.iter()
-        .map(|&id| proto.write(id, address, &[value]))
+        .map(|&id| {
+            proto
+                .write(id, address, &[value])
+                .with_context(|| format!("Failed to write uint8 to id {}", id))
+        })
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
 }
@@ -229,7 +245,11 @@ fn cmd_write_uint16(
     value: u16,
 ) -> Result<String> {
     ids.iter()
-        .map(|&id| proto.write(id, address, &value.to_le_bytes()))
+        .map(|&id| {
+            proto
+                .write(id, address, &value.to_le_bytes())
+                .with_context(|| format!("Failed to write uint16 to id {}", id))
+        })
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
 }
@@ -241,7 +261,11 @@ fn cmd_write_uint32(
     value: u32,
 ) -> Result<String> {
     ids.iter()
-        .map(|&id| proto.write(id, address, &value.to_le_bytes()))
+        .map(|&id| {
+            proto
+                .write(id, address, &value.to_le_bytes())
+                .with_context(|| format!("Failed to write uint32 to id {}", id))
+        })
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
 }
@@ -253,7 +277,11 @@ fn cmd_write_bytes(
     values: &[u8],
 ) -> Result<String> {
     ids.iter()
-        .map(|&id| proto.write(id, address, values))
+        .map(|&id| {
+            proto
+                .write(id, address, values)
+                .with_context(|| format!("Failed to write register to id {}", id))
+        })
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
 }
@@ -280,7 +308,7 @@ fn cmd_write_reg(
         .map(|_| Ok(String::new()))?
 }
 
-fn main() {
+fn main() -> Result<()> {
     let cli = Cli::parse();
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(if cli.debug {
@@ -309,7 +337,7 @@ fn main() {
     let mut proto_box = protocol::make_protocol(cli.protocol, port, cli.retries);
     let proto = proto_box.as_mut();
 
-    match match cli.command {
+    match cli.command {
         cli::Commands::ListModels => cmd_list_models(cli.protocol, fmt),
         cli::Commands::ListRegisters { model } => cmd_list_registers(cli.protocol, &model, fmt),
         cli::Commands::Scan {
@@ -346,12 +374,6 @@ fn main() {
             values,
         } => cmd_write_bytes(proto, &ids, address, &values),
         cli::Commands::WriteReg { ids, reg, value } => cmd_write_reg(proto, &ids, reg, value),
-    } {
-        Ok(s) => {
-            println!("{}", s)
-        }
-        Err(e) => {
-            error!("{}", e)
-        }
     }
+    .map(|str| println!("{}", str))
 }
