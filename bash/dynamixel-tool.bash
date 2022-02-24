@@ -1,3 +1,33 @@
+_dynamixel-tool-models() {
+    local P
+    if echo "${COMP_WORDS[@]}" | egrep '\-P\s*2|--protocol[= ]*2'>/dev/null; then
+        P='-P2'
+    fi
+    echo $("${COMP_WORDS[0]}" ${P} list-models 2>/dev/null)
+}
+
+_dynamixel-tool-regs() {
+    local P M regs models
+
+    if echo "${COMP_WORDS[@]}" | egrep '\-P\s*2|--protocol[= ]*2'>/dev/null; then
+        P='-P2'
+    fi
+
+    M=$(echo $1 | cut -d / -f 1)
+
+    if [[ $("${COMP_WORDS[0]}" ${P} list-models 2>/dev/null | egrep ^$M | wc -l) == 1 ]]; then
+        M=$("${COMP_WORDS[0]}" ${P} list-models 2>/dev/null | egrep ^$M)
+    fi
+
+    regs="$("${COMP_WORDS[0]}" ${P} list-registers $M 2>/dev/null | cut -c 11- | sed s,^,$M/,)"
+
+    if [[ -n $regs ]]; then
+        echo "$regs"
+    else
+        echo $("${COMP_WORDS[0]}" ${P} list-models 2>/dev/null)
+    fi
+}
+
 _dynamixel-tool() {
     local i cur prev opts cmds
     COMPREPLY=()
@@ -135,7 +165,7 @@ _dynamixel-tool() {
             return 0
             ;;
         dynamixel__tool__list__registers)
-            opts="-h --help <MODEL>"
+            opts="-h --help $(_dynamixel-tool-models)"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -168,11 +198,11 @@ _dynamixel-tool() {
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
-            case "${prev}" in
-                *)
-                    COMPREPLY=()
-                    ;;
-            esac
+
+            if [[ ${COMP_WORDS[$((COMP_CWORD-2))]} == read-reg ]]; then
+                opts=$(_dynamixel-tool-regs "${cur}")
+            fi
+
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
@@ -252,11 +282,11 @@ _dynamixel-tool() {
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
-            case "${prev}" in
-                *)
-                    COMPREPLY=()
-                    ;;
-            esac
+
+            if [[ ${COMP_WORDS[$((COMP_CWORD-2))]} == write-reg ]]; then
+                opts=$(_dynamixel-tool-regs "${cur}")
+            fi
+
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
