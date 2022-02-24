@@ -6,6 +6,7 @@ mod regs;
 use anyhow::{anyhow, Context, Result};
 use clap::CommandFactory;
 use clap_complete::{generate, shells::Bash};
+use log::error;
 use regs::RegSpec;
 use std::io;
 use std::{convert::TryFrom, convert::TryInto, fmt::Display};
@@ -280,7 +281,7 @@ fn cmd_write_bytes(
         .map(|&id| {
             proto
                 .write(id, address, values)
-                .with_context(|| format!("Failed to write register to id {}", id))
+                .with_context(|| format!("Failed to write bytes to id {}", id))
         })
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
@@ -295,20 +296,23 @@ fn cmd_write_reg(
     let reg = regs::find_register(proto.version(), regspec).ok_or(anyhow!("Register not found"))?;
 
     ids.iter()
-        .map(|&id| match reg.size {
-            regs::RegSize::Byte => {
-                proto.write(id, reg.address, &u8::try_from(value)?.to_le_bytes())
+        .map(|&id| {
+            match reg.size {
+                regs::RegSize::Byte => {
+                    proto.write(id, reg.address, &u8::try_from(value)?.to_le_bytes())
+                }
+                regs::RegSize::Half => {
+                    proto.write(id, reg.address, &u16::try_from(value)?.to_le_bytes())
+                }
+                regs::RegSize::Word => proto.write(id, reg.address, &value.to_le_bytes()),
             }
-            regs::RegSize::Half => {
-                proto.write(id, reg.address, &u16::try_from(value)?.to_le_bytes())
-            }
-            regs::RegSize::Word => proto.write(id, reg.address, &value.to_le_bytes()),
+            .with_context(|| format!("Failed to write register to id {}", id))
         })
         .collect::<Result<Vec<_>, _>>()
         .map(|_| Ok(String::new()))?
 }
 
-fn main() -> Result<()> {
+fn do_main() -> Result<String> {
     if std::env::var("GENERATE_COMPLETION").is_ok() {
         generate(
             Bash,
@@ -317,7 +321,7 @@ fn main() -> Result<()> {
             &mut io::stdout(),
         );
 
-        return Ok(());
+        return Ok(String::default());
     }
 
     let cli = Cli::parse();
@@ -379,5 +383,11 @@ fn main() -> Result<()> {
         } => cmd_write_bytes(proto, &ids, address, &values),
         cli::Commands::WriteReg { ids, reg, value } => cmd_write_reg(proto, &ids, reg, value),
     }
-    .map(|str| println!("{}", str))
+}
+
+fn main() {
+    match do_main() {
+        Ok(s) => println!("{}", s),
+        Err(e) => error!("{:#}", e),
+    }
 }
