@@ -340,48 +340,60 @@ fn do_main() -> Result<String> {
         OutputFormat::Plain
     };
 
-    let port = port::open_port(&cli.port, cli.baudrate, cli.force)?;
-
-    let mut proto_box = protocol::make_protocol(cli.protocol, port, cli.retries);
-    let proto = proto_box.as_mut();
-
     match cli.command {
         cli::Commands::ListModels => cmd_list_models(cli.protocol, fmt),
         cli::Commands::ListRegisters { model } => cmd_list_registers(cli.protocol, &model, fmt),
-        cli::Commands::Scan {
-            scan_start,
-            scan_end,
-        } => cmd_scan(proto, scan_start, scan_end, fmt),
-        cli::Commands::ReadUint8 { ids, address } => cmd_read_uint8(proto, &ids, address, fmt),
-        cli::Commands::ReadUint16 { ids, address } => cmd_read_uint16(proto, &ids, address, fmt),
-        cli::Commands::ReadUint32 { ids, address } => cmd_read_uint32(proto, &ids, address, fmt),
-        cli::Commands::ReadBytes {
-            ids,
-            address,
-            count,
-        } => cmd_read_bytes(proto, &ids, address, count, fmt),
-        cli::Commands::ReadReg { ids, reg } => cmd_read_reg(proto, &ids, reg, fmt),
-        cli::Commands::WriteUint8 {
-            ids,
-            address,
-            value,
-        } => cmd_write_uint8(proto, &ids, address, value),
-        cli::Commands::WriteUint16 {
-            ids,
-            address,
-            value,
-        } => cmd_write_uint16(proto, &ids, address, value),
-        cli::Commands::WriteUint32 {
-            ids,
-            address,
-            value,
-        } => cmd_write_uint32(proto, &ids, address, value),
-        cli::Commands::WriteBytes {
-            ids,
-            address,
-            values,
-        } => cmd_write_bytes(proto, &ids, address, &values),
-        cli::Commands::WriteReg { ids, reg, value } => cmd_write_reg(proto, &ids, reg, value),
+        _ => {
+            let port = port::open_port(&cli.port, cli.baudrate, cli.force)?;
+            let mut proto_box = protocol::make_protocol(cli.protocol, port, cli.retries);
+            let proto = proto_box.as_mut();
+
+            match cli.command {
+                cli::Commands::Scan {
+                    scan_start,
+                    scan_end,
+                } => cmd_scan(proto, scan_start, scan_end, fmt),
+                cli::Commands::ReadUint8 { ids, address } => {
+                    cmd_read_uint8(proto, &ids, address, fmt)
+                }
+                cli::Commands::ReadUint16 { ids, address } => {
+                    cmd_read_uint16(proto, &ids, address, fmt)
+                }
+                cli::Commands::ReadUint32 { ids, address } => {
+                    cmd_read_uint32(proto, &ids, address, fmt)
+                }
+                cli::Commands::ReadBytes {
+                    ids,
+                    address,
+                    count,
+                } => cmd_read_bytes(proto, &ids, address, count, fmt),
+                cli::Commands::ReadReg { ids, reg } => cmd_read_reg(proto, &ids, reg, fmt),
+                cli::Commands::WriteUint8 {
+                    ids,
+                    address,
+                    value,
+                } => cmd_write_uint8(proto, &ids, address, value),
+                cli::Commands::WriteUint16 {
+                    ids,
+                    address,
+                    value,
+                } => cmd_write_uint16(proto, &ids, address, value),
+                cli::Commands::WriteUint32 {
+                    ids,
+                    address,
+                    value,
+                } => cmd_write_uint32(proto, &ids, address, value),
+                cli::Commands::WriteBytes {
+                    ids,
+                    address,
+                    values,
+                } => cmd_write_bytes(proto, &ids, address, &values),
+                cli::Commands::WriteReg { ids, reg, value } => {
+                    cmd_write_reg(proto, &ids, reg, value)
+                }
+                _ => Err(anyhow!("unexpected command (this is a bug!)")),
+            }
+        }
     }
 }
 
