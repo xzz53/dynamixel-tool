@@ -1,4 +1,8 @@
 # Dynamixel tool &mdash; an unofficial Dynamixel protocol CLI
+Reading and writing dynamixel device registers of any size via v1 or
+v2 protocols. Built-in register descriptions for (almost) all released
+servos/boards, including tab completion. Scripting friendly.
+
 ## Protocol reference
 - https://emanual.robotis.com/docs/en/dxl/protocol1/
 - https://emanual.robotis.com/docs/en/dxl/protocol2/
