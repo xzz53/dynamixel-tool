@@ -1,0 +1,24 @@
+[package]
+name = "dynamixel-utils"
+version = "1.1.1"
+edition = "2018"
+authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
+description = "Dynamixel utilities library"
+homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
+
+[lib]
+name = "dynamixel_utils"
+
+[dependencies]
+anyhow = "^1.0"
+crc = "^2.1"
+glob = "^0.3"
+itertools = "0.10.3"
+lazy_static = "1.4.0"
+log = "^0.4"
+nix = "^0.23"
+regex = "1.5.4"
+thiserror = "^1"
+serialport = "^4"
+
+[features]

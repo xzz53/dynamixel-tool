@@ -1,0 +1,23 @@
+[package]
+name = "dynamixel-tool"
+version = "1.1.1"
+edition = "2018"
+authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
+description = "Dynamixel test tool"
+homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
+
+[dependencies]
+anyhow = "^1.0"
+clap = { version = "3.1.0", features = ["derive"] }
+clap_complete = "3.1.0"
+env_logger = "^0.9"
+json = "^0.12"
+lazy_static = "1.4.0"
+log = "^0.4"
+num = "0.4.0"
+regex = "1.5.4"
+thiserror = "^1"
+
+dynamixel-utils = { path = "../dynamixel-utils" }
+
+[features]
