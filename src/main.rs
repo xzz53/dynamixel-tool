@@ -1,18 +1,17 @@
-mod cli;
-mod port;
-mod protocol;
-mod regs;
+pub mod cli;
 
 use anyhow::{anyhow, Context, Result};
 use clap::CommandFactory;
 use clap_complete::{generate, shells::Bash};
 use log::error;
-use regs::RegSpec;
 use std::io;
 use std::{convert::TryFrom, convert::TryInto, fmt::Display};
 
 use cli::{Cli, StructOpt};
-use protocol::{Protocol, ProtocolVersion};
+
+use dynamixel_utils::port;
+use dynamixel_utils::protocol::{self, Protocol, ProtocolVersion};
+use dynamixel_utils::regs::{self, RegSpec};
 
 enum OutputFormat {
     Plain,

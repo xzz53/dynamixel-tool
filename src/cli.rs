@@ -8,8 +8,8 @@ use std::ops::Deref;
 use std::str::FromStr;
 use thiserror::Error;
 
-use crate::protocol::ProtocolVersion;
-use crate::regs::RegSpec;
+use dynamixel_utils::protocol::ProtocolVersion;
+use dynamixel_utils::regs::RegSpec;
 
 #[derive(Error, Debug)]
 pub enum RangeError {

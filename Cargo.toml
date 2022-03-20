@@ -6,6 +6,14 @@ authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
 description = "Dynamixel test tool"
 homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
 
+[[bin]]
+name = "dynamixel-tool"
+path = "src/main.rs"
+
+[lib]
+name = "dynamixel_utils"
+path = "src/lib/lib.rs"
+
 [dependencies]
 anyhow = "^1.0"
 clap = { version = "3.1.0", features = ["derive"] }
