@@ -7,7 +7,6 @@ description = "Dynamixel utilities library"
 homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
 
 [lib]
-name = "dynamixel_utils"
 
 [dependencies]
 anyhow = "^1.0"
