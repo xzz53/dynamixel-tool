@@ -343,8 +343,8 @@ fn do_main() -> Result<String> {
         cli::Commands::ListModels => cmd_list_models(cli.protocol, fmt),
         cli::Commands::ListRegisters { model } => cmd_list_registers(cli.protocol, &model, fmt),
         _ => {
-            let port = port::open_port(&cli.port, cli.baudrate, cli.force)?;
-            let mut proto_box = protocol::make_protocol(cli.protocol, port, cli.retries);
+            let mut port = port::open_port(&cli.port, cli.baudrate, cli.force)?;
+            let mut proto_box = protocol::make_protocol(cli.protocol, port.as_mut(), cli.retries);
             let proto = proto_box.as_mut();
 
             match cli.command {

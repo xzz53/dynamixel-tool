@@ -1,23 +1,23 @@
 use super::{Protocol, ProtocolError, ProtocolVersion, Result, SerialPort};
 use log::debug;
 
-pub struct ProtocolV1 {
-    port: Box<dyn SerialPort>,
+pub struct ProtocolV1<'a> {
+    port: &'a mut dyn SerialPort,
     retries: usize,
 }
 
-impl ProtocolV1 {
-    pub fn new(port: Box<dyn SerialPort>, retries: usize) -> Self {
+impl<'a> ProtocolV1<'a> {
+    pub fn new(port: &'a mut dyn SerialPort, retries: usize) -> Self {
         Self { port, retries }
     }
 }
 
-impl Protocol for ProtocolV1 {
+impl<'a> Protocol for ProtocolV1<'a> {
     fn scan(&mut self, scan_start: u8, scan_end: u8) -> Result<Vec<u8>> {
         let mut result: Vec<u8> = Vec::new();
         (scan_start..scan_end).into_iter().for_each(|id| {
             for _ in 0..=self.retries {
-                if ping_v1(self.port.as_mut(), id).is_ok() {
+                if ping_v1(self.port, id).is_ok() {
                     result.push(id);
                     break;
                 }
@@ -38,7 +38,7 @@ impl Protocol for ProtocolV1 {
         let mut error = None;
 
         for _ in 0..=self.retries {
-            match read_v1(self.port.as_mut(), id, address as u8, count as u8) {
+            match read_v1(self.port, id, address as u8, count as u8) {
                 Ok(data) => return Ok(data),
                 Err(e) => error = Some(e),
             }
@@ -54,7 +54,7 @@ impl Protocol for ProtocolV1 {
         }
 
         for _ in 0..=self.retries {
-            match write_v1(self.port.as_mut(), id, address as u8, data) {
+            match write_v1(self.port, id, address as u8, data) {
                 Ok(data) => return Ok(data),
                 Err(e) => error = Some(e),
             }

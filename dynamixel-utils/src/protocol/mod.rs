@@ -39,11 +39,11 @@ impl FromStr for ProtocolVersion {
     }
 }
 
-pub fn make_protocol(
+pub fn make_protocol<'a>(
     version: ProtocolVersion,
-    port: Box<dyn SerialPort>,
+    port: &'a mut dyn SerialPort,
     retries: usize,
-) -> Box<dyn Protocol> {
+) -> Box<dyn Protocol + 'a> {
     match version {
         ProtocolVersion::V1 => Box::new(ProtocolV1::new(port, retries)),
         ProtocolVersion::V2 => Box::new(ProtocolV2::new(port, retries)),

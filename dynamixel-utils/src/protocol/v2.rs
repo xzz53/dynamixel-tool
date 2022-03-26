@@ -3,23 +3,23 @@ use crc::{self, Crc, CRC_16_UMTS};
 use log::debug;
 use std::convert::TryInto;
 
-pub struct ProtocolV2 {
-    port: Box<dyn SerialPort>,
+pub struct ProtocolV2<'a> {
+    port: &'a mut dyn SerialPort,
     retries: usize,
 }
 
-impl ProtocolV2 {
-    pub fn new(port: Box<dyn SerialPort>, retries: usize) -> Self {
+impl<'a> ProtocolV2<'a> {
+    pub fn new(port: &'a mut dyn SerialPort, retries: usize) -> Self {
         Self { port, retries }
     }
 }
 
-impl Protocol for ProtocolV2 {
+impl<'a> Protocol for ProtocolV2<'a> {
     fn scan(&mut self, scan_start: u8, scan_end: u8) -> Result<Vec<u8>> {
         let mut result: Vec<u8> = Vec::new();
         (scan_start..scan_end).into_iter().for_each(|id| {
             for _ in 0..=self.retries {
-                if ping(self.port.as_mut(), id).is_ok() {
+                if ping(self.port, id).is_ok() {
                     result.push(id);
                     break;
                 }
@@ -31,7 +31,7 @@ impl Protocol for ProtocolV2 {
     fn read(&mut self, id: u8, address: u16, count: u16) -> Result<Vec<u8>> {
         let mut error = None;
         for _ in 0..=self.retries {
-            match read1(self.port.as_mut(), id, address, count) {
+            match read1(self.port, id, address, count) {
                 Ok(data) => return Ok(data),
                 Err(e) => error = Some(e),
             }
@@ -43,7 +43,7 @@ impl Protocol for ProtocolV2 {
         let mut error = None;
 
         for _ in 0..=self.retries {
-            match write1(self.port.as_mut(), id, address, data) {
+            match write1(self.port, id, address, data) {
                 Ok(data) => return Ok(data),
                 Err(e) => error = Some(e),
             }
