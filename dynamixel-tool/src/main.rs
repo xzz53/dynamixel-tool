@@ -206,6 +206,7 @@ fn cmd_read_reg(
                 regs::RegSize::Byte => u8::from_le_bytes(bytes[0..=0].try_into().unwrap()) as u32,
                 regs::RegSize::Half => u16::from_le_bytes(bytes[0..=1].try_into().unwrap()) as u32,
                 regs::RegSize::Word => u32::from_le_bytes(bytes[0..=3].try_into().unwrap()),
+                regs::RegSize::Variable => panic!("variable size registers not supported!"),
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -304,6 +305,7 @@ fn cmd_write_reg(
                     proto.write(id, reg.address, &u16::try_from(value)?.to_le_bytes())
                 }
                 regs::RegSize::Word => proto.write(id, reg.address, &value.to_le_bytes()),
+                regs::RegSize::Variable => panic!("variable size registers not supported!"),
             }
             .with_context(|| format!("Failed to write register to id {}", id))
         })

@@ -31,6 +31,7 @@ pub enum RegSize {
     Byte = 1,
     Half = 2,
     Word = 4,
+    Variable = 0,
 }
 
 #[derive(Debug, Clone, Copy)]
