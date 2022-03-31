@@ -26,7 +26,7 @@ impl Display for Access {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RegSize {
     Byte = 1,
     Half = 2,
