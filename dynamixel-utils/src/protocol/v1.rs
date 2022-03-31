@@ -92,7 +92,7 @@ fn encode_instruction_v1(buffer: &mut [u8], id: u8, instruction: u8, params: &[u
 }
 
 fn decode_status_v1(buffer: &[u8], params: &mut [u8]) -> Result<usize> {
-    if buffer.len() < 6 {
+    if buffer.len() < 6 || buffer[3] < 2 {
         return Err(ProtocolError::BadPacket.into());
     }
 

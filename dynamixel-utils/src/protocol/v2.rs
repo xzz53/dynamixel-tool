@@ -86,7 +86,11 @@ fn decode_status_v2(buffer: &[u8], params: &mut [u8]) -> Result<usize> {
         return Err(ProtocolError::BadPacket.into());
     }
 
-    let param_length: usize = u16::from_le_bytes(buffer[5..7].try_into().unwrap()) as usize - 4;
+    let length = u16::from_le_bytes(buffer[5..7].try_into().unwrap());
+    if length < 4 {
+        return Err(ProtocolError::BadPacket.into());
+    }
+    let param_length: usize = length as usize - 4;
 
     if buffer.len() < (10 + param_length) || buffer[0..4] != [0xFF, 0xFF, 0xFD, 0x00] {
         return Err(ProtocolError::BadPacket.into());
