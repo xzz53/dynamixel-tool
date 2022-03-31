@@ -44,7 +44,7 @@ pub struct Reg {
 }
 
 impl Reg {
-    const fn new(
+    pub const fn new(
         model: &'static str,
         proto: ProtocolVersion,
         name: &'static str,
