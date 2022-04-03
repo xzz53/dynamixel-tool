@@ -120,11 +120,11 @@ fn ping(port: &mut dyn SerialPort, id: u8) -> Result<()> {
     let len_read = 14;
 
     debug!("ping {}", id);
-    debug!("send {:?}", &buffer[0..len_write]);
+    debug!("send {:02X?}", &buffer[0..len_write]);
     port.write_all(&buffer[0..len_write])?;
 
     port.read_exact(&mut buffer[0..len_read])?;
-    debug!("recv {:?}", &buffer[0..len_read]);
+    debug!("recv {:02X?}", &buffer[0..len_read]);
 
     decode_status_v2(&buffer, &mut params).map(|_| Ok(()))?
 }
@@ -141,12 +141,12 @@ fn read1(port: &mut dyn SerialPort, id: u8, address: u16, count: u16) -> Result<
     );
 
     debug!("read1 {} {} {}", id, address, count);
-    debug!("send {:?}", &buffer[0..len_write]);
+    debug!("send {:02X?}", &buffer[0..len_write]);
     port.write_all(&buffer[0..len_write])?;
 
     let len_read = (11 + count) as usize;
     port.read_exact(&mut buffer[0..len_read])?;
-    debug!("recv {:?}", &buffer[0..len_read]);
+    debug!("recv {:02X?}", &buffer[0..len_read]);
 
     decode_status_v2(&buffer, &mut params).map(|_| Ok(params[0..count.into()].to_vec()))?
 }
@@ -160,14 +160,14 @@ fn write1(port: &mut dyn SerialPort, id: u8, address: u16, data: &[u8]) -> Resul
 
     let len_write = encode_instruction_v2(&mut buffer, id, OPCODE_WRITE, &params[..2 + data.len()]);
 
-    debug!("write1 {} {} {:?}", id, address, data);
-    debug!("send {:?}", &buffer[0..len_write]);
+    debug!("write1 {} {} {:02X?}", id, address, data);
+    debug!("send {:02X?}", &buffer[0..len_write]);
     port.write_all(&buffer[0..len_write])?;
 
     let len_read = 11;
 
     port.read_exact(&mut buffer[0..len_read])?;
-    debug!("recv {:?}", &buffer[0..len_read]);
+    debug!("recv {:02X?}", &buffer[0..len_read]);
 
     decode_status_v2(&buffer, &mut params).map(|_| Ok(()))?
 }
