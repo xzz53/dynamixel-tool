@@ -40,7 +40,11 @@ trait Rs485 {
 #[derive(PartialEq)]
 struct UsbId(u16, u16);
 
-static COMPATIBLE_IDS: &[UsbId] = &[UsbId(0x16d0, 0x06a7), UsbId(0x0403, 0x6014)];
+static COMPATIBLE_IDS: &[UsbId] = &[
+    UsbId(0x16d0, 0x06a7), // MCS USB2AX
+    UsbId(0x0403, 0x6014), // FTDI FT232H Single HS USB-UART/FIFO IC
+    UsbId(0x1a86, 0x7523), // QinHeng Electronics HL-340 USB-Serial adapter
+];
 
 pub fn open_port(port_name: &str, baudrate: u32, force: bool) -> Result<Box<dyn SerialPort>> {
     let true_name: String = if port_name == "auto" {
