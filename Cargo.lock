@@ -135,7 +135,7 @@ checksum = "ccaeedb56da03b09f598226e25e80088cb4cd25f316e6e4df7d695f0feeb1403"
 
 [[package]]
 name = "dynamixel-tool"
-version = "1.1.1"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -152,7 +152,7 @@ dependencies = [
 
 [[package]]
 name = "dynamixel-utils"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "crc",
