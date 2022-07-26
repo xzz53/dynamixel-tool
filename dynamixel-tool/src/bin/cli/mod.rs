@@ -73,6 +73,48 @@ impl FromStr for IdRange {
     }
 }
 
+#[derive(Debug)]
+pub struct MultiReadSpec {
+    pub id: u8,
+    pub address: u16,
+    pub size: u16,
+}
+
+impl FromStr for MultiReadSpec {
+    type Err = RangeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        lazy_static! {
+            static ref RE: Regex = Regex::new(r"^(\d+):(\d+):(\d+)$").unwrap();
+        }
+
+        if let Some(c) = RE.captures(s) {
+            Ok(MultiReadSpec {
+                id: c
+                    .get(1)
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .map_err(|_| RangeError::BadRange(s.to_string()))?,
+                address: c
+                    .get(2)
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .map_err(|_| RangeError::BadRange(s.to_string()))?,
+                size: c
+                    .get(3)
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .map_err(|_| RangeError::BadRange(s.to_string()))?,
+            })
+        } else {
+            Err(RangeError::BadRange(s.to_string()))
+        }
+    }
+}
+
 fn parse_with_radix<T>(input: &str) -> Result<T, T::FromStrRadixErr>
 where
     T: num::Num,
@@ -171,6 +213,10 @@ pub enum Commands {
         #[clap(parse(try_from_str=parse_with_radix))]
         count: u16,
     },
+
+    /// Read mutiple byte arrays
+    #[clap(visible_alias = "readm")]
+    ReadBytesMultiple { specs: Vec<MultiReadSpec> },
 
     /// Read register
     ReadReg { ids: IdRange, reg: RegSpec },

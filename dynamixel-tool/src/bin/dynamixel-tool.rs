@@ -7,7 +7,7 @@ use log::error;
 use std::io;
 use std::{convert::TryFrom, convert::TryInto, fmt::Display};
 
-use cli::{Cli, StructOpt};
+use cli::{Cli, MultiReadSpec, StructOpt};
 
 use dynamixel_utils::port;
 use dynamixel_utils::protocol::{self, Protocol, ProtocolVersion};
@@ -169,6 +169,36 @@ fn cmd_read_bytes(
             proto
                 .read(id, address, count)
                 .with_context(|| format!("Failed to read bytes from id {}", id))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(match fmt {
+        OutputFormat::Plain => res
+            .iter()
+            .map(|x| slice_to_line(x.as_slice()))
+            .collect::<Vec<String>>()
+            .join("\n"),
+        OutputFormat::Json => {
+            if res.len() > 1 {
+                json::stringify(res)
+            } else {
+                json::stringify(res[0].clone())
+            }
+        }
+    })
+}
+
+fn cmd_read_bytes_multiple(
+    proto: &mut dyn Protocol,
+    specs: &[MultiReadSpec],
+    fmt: OutputFormat,
+) -> Result<String> {
+    let res = specs
+        .iter()
+        .map(|spec| -> Result<Vec<u8>> {
+            proto
+                .read(spec.id, spec.address, spec.size)
+                .with_context(|| format!("Failed to read bytes from id {}", spec.id))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -368,6 +398,9 @@ fn do_main() -> Result<String> {
                     address,
                     count,
                 } => cmd_read_bytes(proto, &ids, address, count, fmt),
+                cli::Commands::ReadBytesMultiple { specs } => {
+                    cmd_read_bytes_multiple(proto, &specs, fmt)
+                }
                 cli::Commands::ReadReg { ids, reg } => cmd_read_reg(proto, &ids, reg, fmt),
                 cli::Commands::WriteUint8 {
                     ids,
