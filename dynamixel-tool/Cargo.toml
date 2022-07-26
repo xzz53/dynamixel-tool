@@ -5,6 +5,7 @@ edition = "2018"
 authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
 description = "Dynamixel test tool"
 homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
+default-run = "dynamixel-tool"
 
 [dependencies]
 anyhow = "^1.0"
