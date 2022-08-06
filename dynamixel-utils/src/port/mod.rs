@@ -82,10 +82,13 @@ fn guess_port() -> Result<String> {
             SerialPortType::UsbPort(usb_info) => {
                 COMPATIBLE_IDS.contains(&UsbId(usb_info.vid, usb_info.pid))
             }
-            SerialPortType::Unknown => match do_open_port(&info.port_name, 9600) {
-                Ok(p) => p.rs485_is_supported(),
-                Err(_) => false,
-            },
+            SerialPortType::Unknown => {
+                !is_port_open(&info.port_name)
+                    && match do_open_port(&info.port_name, 9600) {
+                        Ok(p) => p.rs485_is_supported(),
+                        Err(_) => false,
+                    }
+            }
             SerialPortType::PciPort | SerialPortType::BluetoothPort => false,
         })
         .map(|info| info.port_name)
