@@ -57,6 +57,11 @@ Reading registers by name:
 dynamixel-tool read-reg <IDS> <MODEL/REGISTER>
 ```
 
+Reading different registers from multiple devices
+```
+dynamixel-tool  read-bytes-multiple id1:addr1:size1 is2:addr2:size2 ...
+```
+
 ### Writing registers
 Writing registers by address and size.
 ```
