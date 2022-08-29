@@ -65,12 +65,17 @@ dynamixel-tool  read-bytes-multiple id1:addr1:size1 is2:addr2:size2 ...
 ### Writing registers
 Writing registers by address and size.
 ```
-dynamixel-tool read-uint<8|16|32> <IDS> <ADDRESS> <VALUE>
+dynamixel-tool write-uint<8|16|32> <IDS> <ADDRESS> <VALUE>
 ```
 
 Writing registers by name:
 ```
-dynamixel-tool read-reg <IDS> <MODEL/REGISTER> <VALUE>
+dynamixel-tool write-reg <IDS> <MODEL/REGISTER> <VALUE>
+```
+
+Writing multiple byte buffers to different IDs and adresses:
+```
+dynamixel-tool write-bytes-multiple id1:addr1:<hex bytes1> id2:addr2:<hex bytes2>...
 ```
 
 ## Misc
