@@ -7,7 +7,7 @@ use log::error;
 use std::io;
 use std::{convert::TryFrom, convert::TryInto, fmt::Display};
 
-use cli::{Cli, MultiReadSpec, StructOpt};
+use cli::{Cli, MultiReadSpec, MultiWriteSpec, StructOpt};
 
 use dynamixel_utils::port;
 use dynamixel_utils::protocol::{self, Protocol, ProtocolVersion};
@@ -317,6 +317,18 @@ fn cmd_write_bytes(
         .map(|_| Ok(String::new()))?
 }
 
+fn cmd_write_bytes_multiple(proto: &mut dyn Protocol, specs: &[MultiWriteSpec]) -> Result<String> {
+    specs
+        .iter()
+        .map(|spec| {
+            proto
+                .write(spec.id, spec.address, &spec.data)
+                .with_context(|| format!("Failed to write bytes to id {}", spec.id))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(|_| Ok(String::new()))?
+}
+
 fn cmd_write_reg(
     proto: &mut dyn Protocol,
     ids: &[u8],
@@ -424,6 +436,9 @@ fn do_main() -> Result<String> {
                 } => cmd_write_bytes(proto, &ids, address, &values),
                 cli::Commands::WriteReg { ids, reg, value } => {
                     cmd_write_reg(proto, &ids, reg, value)
+                }
+                cli::Commands::WriteBytesMultiple { specs } => {
+                    cmd_write_bytes_multiple(proto, &specs)
                 }
                 _ => Err(anyhow!("unexpected command (this is a bug!)")),
             }

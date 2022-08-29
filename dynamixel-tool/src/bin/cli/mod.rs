@@ -1,6 +1,7 @@
 use anyhow::Result;
 pub use clap::StructOpt;
 use clap::{Parser, Subcommand};
+use hex::FromHex;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::cmp;
@@ -115,6 +116,45 @@ impl FromStr for MultiReadSpec {
     }
 }
 
+#[derive(Debug)]
+pub struct MultiWriteSpec {
+    pub id: u8,
+    pub address: u16,
+    pub data: Vec<u8>,
+}
+
+impl FromStr for MultiWriteSpec {
+    type Err = RangeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        lazy_static! {
+            static ref RE: Regex =
+                Regex::new(r"^(\d+):(\d+):((?:[0-9a-fA-F][0-9a-fA-F])+)$").unwrap();
+        }
+
+        if let Some(c) = RE.captures(s) {
+            Ok(MultiWriteSpec {
+                id: c
+                    .get(1)
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .map_err(|_| RangeError::BadRange(s.to_string()))?,
+                address: c
+                    .get(2)
+                    .unwrap()
+                    .as_str()
+                    .parse()
+                    .map_err(|_| RangeError::BadRange(s.to_string()))?,
+                data: Vec::from_hex(c.get(3).unwrap().as_str())
+                    .map_err(|_| RangeError::BadRange(s.to_string()))?,
+            })
+        } else {
+            Err(RangeError::BadRange(s.to_string()))
+        }
+    }
+}
+
 fn parse_with_radix<T>(input: &str) -> Result<T, T::FromStrRadixErr>
 where
     T: num::Num,
@@ -125,7 +165,7 @@ where
     } else if input.starts_with("0b") {
         T::from_str_radix(input.trim_start_matches("0b"), 2)
     } else {
-        T::from_str_radix(input.trim_start_matches("0b"), 10)
+        T::from_str_radix(input, 10)
     }
 }
 
@@ -216,7 +256,10 @@ pub enum Commands {
 
     /// Read mutiple byte arrays
     #[clap(visible_alias = "readm")]
-    ReadBytesMultiple { specs: Vec<MultiReadSpec> },
+    ReadBytesMultiple {
+        #[clap(required = true)]
+        specs: Vec<MultiReadSpec>,
+    },
 
     /// Read register
     ReadReg { ids: IdRange, reg: RegSpec },
@@ -259,6 +302,13 @@ pub enum Commands {
         address: u16,
         #[clap(required = true, parse(try_from_str=parse_with_radix))]
         values: Vec<u8>,
+    },
+
+    /// Write multiple byte arrays
+    #[clap(visible_alias = "writem")]
+    WriteBytesMultiple {
+        #[clap(required = true)]
+        specs: Vec<MultiWriteSpec>,
     },
 
     /// Write register
