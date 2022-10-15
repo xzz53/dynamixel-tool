@@ -1,11 +1,14 @@
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 
 #[cfg(target_os = "linux")]
 use linux::{do_open_port, is_port_open};
-
+#[cfg(target_os = "macos")]
+use macos::{do_open_port, is_port_open};
 #[cfg(target_os = "windows")]
 use windows::{do_open_port, is_port_open};
 
