@@ -113,8 +113,8 @@ fn decode_status_v2(buffer: &[u8], params: &mut [u8]) -> Result<usize> {
 }
 
 fn ping(port: &mut dyn SerialPort, id: u8) -> Result<()> {
-    let mut buffer = [0u8; 255];
-    let mut params = [0u8; 255];
+    let mut buffer = [0u8; 65535];
+    let mut params = [0u8; 65535];
 
     let len_write = encode_instruction_v2(&mut buffer, id, OPCODE_PING, &[]);
     let len_read = 14;
@@ -130,8 +130,8 @@ fn ping(port: &mut dyn SerialPort, id: u8) -> Result<()> {
 }
 
 fn read1(port: &mut dyn SerialPort, id: u8, address: u16, count: u16) -> Result<Vec<u8>> {
-    let mut buffer = [0u8; 255];
-    let mut params = [0u8; 255];
+    let mut buffer = [0u8; 65535];
+    let mut params = [0u8; 65535];
 
     let len_write = encode_instruction_v2(
         &mut buffer,
@@ -152,8 +152,8 @@ fn read1(port: &mut dyn SerialPort, id: u8, address: u16, count: u16) -> Result<
 }
 
 fn write1(port: &mut dyn SerialPort, id: u8, address: u16, data: &[u8]) -> Result<()> {
-    let mut buffer: [u8; 255] = [0; 255];
-    let mut params: [u8; 255] = [0; 255];
+    let mut buffer: [u8; 65535] = [0; 65535];
+    let mut params: [u8; 65535] = [0; 65535];
 
     params[0..2].clone_from_slice(&address.to_le_bytes());
     params[2..2 + data.len()].copy_from_slice(data);
