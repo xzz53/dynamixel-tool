@@ -1,11 +1,11 @@
 use anyhow::Result;
 
-use dynamixel_utils::port;
+use dynamixel_utils::port::{self, SerialPort};
 use dynamixel_utils::protocol::{self, ProtocolVersion};
 use env_logger::TimestampPrecision;
 
 fn main() -> Result<()> {
-    let mut port = port::open_port("auto", 1000000, false)?;
+    let mut port: Box<dyn SerialPort + Send> = port::open_port("auto", 1000000, false)?;
     let mut proto_box = protocol::make_protocol(ProtocolVersion::V1, port.as_mut(), 0);
 
     env_logger::Builder::from_env(env_logger::Env::default())

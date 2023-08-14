@@ -15,7 +15,8 @@ use windows::{do_open_port, is_port_open};
 use anyhow::Result;
 use core::time::Duration;
 use log::debug;
-use serialport::{self, SerialPort, SerialPortType};
+pub use serialport::SerialPort;
+use serialport::{self, SerialPortType};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
