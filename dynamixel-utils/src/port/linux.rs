@@ -46,6 +46,7 @@ impl Rs485 for NativePort {
     }
 }
 
+#[allow(dead_code)]
 mod ioctl {
     use super::*;
     pub const SER_RS485_ENABLED: u32 = 1 << 0;
