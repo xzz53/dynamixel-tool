@@ -37,7 +37,7 @@ impl Rs485 for NativePort {
     fn rs485_enable(&self, enable: bool) -> Result<()> {
         let mut rs485 = ioctl::serial_rs485::default();
         if enable {
-            rs485.flags |= ioctl::SER_RS485_ENABLED;
+            rs485.flags |= ioctl::SER_RS485_ENABLED | ioctl::SER_RS485_RTS_ON_SEND;
         }
         match unsafe { ioctl::serial_rs485_set(self.as_raw_fd(), &rs485) } {
             Ok(_) => Ok(()),
@@ -49,6 +49,13 @@ impl Rs485 for NativePort {
 mod ioctl {
     use super::*;
     pub const SER_RS485_ENABLED: u32 = 1 << 0;
+    pub const SER_RS485_RTS_ON_SEND: u32 = 1 << 1;
+    pub const SER_RS485_RTS_AFTER_SEND: u32 = 1 << 2;
+    pub const SER_RS485_RX_DURING_TX: u32 = 1 << 4;
+    pub const SER_RS485_TERMINATE_BUS: u32 = 1 << 5;
+    pub const SER_RS485_ADDRB: u32 = 1 << 6;
+    pub const SER_RS485_ADDR_RECV: u32 = 1 << 7;
+    pub const SER_RS485_ADDR_DEST: u32 = 1 << 8;
 
     #[allow(non_camel_case_types)]
     #[derive(Debug, Default)]
