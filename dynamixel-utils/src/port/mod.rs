@@ -49,7 +49,11 @@ static COMPATIBLE_IDS: &[UsbId] = &[
     UsbId(0x1a86, 0x7523), // QinHeng Electronics HL-340 USB-Serial adapter
 ];
 
-pub fn open_port(port_name: &str, baudrate: u32, force: bool) -> Result<Box<dyn SerialPort>> {
+pub fn open_port(
+    port_name: &str,
+    baudrate: u32,
+    force: bool,
+) -> Result<Box<dyn SerialPort + Send>> {
     let true_name: String = if port_name == "auto" {
         guess_port()?
     } else {
