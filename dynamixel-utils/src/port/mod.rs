@@ -48,6 +48,7 @@ static COMPATIBLE_IDS: &[UsbId] = &[
     UsbId(0x16d0, 0x06a7), // MCS USB2AX
     UsbId(0x0403, 0x6014), // FTDI FT232H Single HS USB-UART/FIFO IC
     UsbId(0x1a86, 0x7523), // QinHeng Electronics HL-340 USB-Serial adapter
+    UsbId(0x0483, 0x5740), // STMicroelectronics Virtual COM Port
 ];
 
 pub fn open_port(
