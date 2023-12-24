@@ -7,10 +7,6 @@ use serialport::TTYPort as NativePort;
 use std::fs;
 use std::os::unix::io::AsRawFd;
 
-pub fn do_open_port(port_name: &str, baudrate: u32) -> Result<NativePort> {
-    Ok(serialport::new(port_name, baudrate).open_native()?)
-}
-
 pub fn is_port_open(port_name: &str) -> bool {
     glob("/proc/[0-9]*/fd/*")
         .unwrap()

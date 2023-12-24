@@ -3,10 +3,6 @@ use anyhow::Result;
 use serialport::COMPort as NativePort;
 use serialport::SerialPort;
 
-pub fn do_open_port(port_name: &str, baudrate: u32) -> Result<NativePort> {
-    Ok(serialport::new(port_name, baudrate).open_native()?)
-}
-
 // TODO: implement proper check
 pub fn is_port_open(_port_name: &str) -> bool {
     false

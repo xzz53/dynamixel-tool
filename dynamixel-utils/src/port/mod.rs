@@ -6,11 +6,11 @@ mod macos;
 mod windows;
 
 #[cfg(target_os = "linux")]
-use linux::{do_open_port, is_port_open};
+use linux::is_port_open;
 #[cfg(target_os = "macos")]
-use macos::{do_open_port, is_port_open};
+use macos::is_port_open;
 #[cfg(target_os = "windows")]
-use windows::{do_open_port, is_port_open};
+use windows::is_port_open;
 
 use anyhow::Result;
 use core::time::Duration;
@@ -69,7 +69,7 @@ pub fn open_port(
         .into());
     }
 
-    let mut port = do_open_port(&true_name, baudrate)?;
+    let mut port = serialport::new(&true_name, baudrate).open_native()?;
 
     if true_name.contains("ttyS") && port.rs485_enable(true).is_err() && !force {
         return Err(OpenPortError::Rs485Error {
@@ -93,7 +93,7 @@ fn guess_port() -> Result<String> {
             }
             SerialPortType::Unknown => {
                 !is_port_open(&info.port_name)
-                    && match do_open_port(&info.port_name, 9600) {
+                    && match serialport::new(&info.port_name, 9600).open_native() {
                         Ok(p) => p.rs485_is_supported(),
                         Err(_) => false,
                     }
