@@ -23,3 +23,19 @@ impl Rs485 for NativePort {
         .into())
     }
 }
+
+impl Rs485 for super::SerialStream {
+    fn rs485_is_enabled(&self) -> Result<bool> {
+        Err(OpenPortError::Rs485Error {
+            port_name: self.name().unwrap_or_default(),
+        }
+        .into())
+    }
+
+    fn rs485_enable(&self, _enable: bool) -> Result<()> {
+        Err(OpenPortError::Rs485Error {
+            port_name: self.name().unwrap_or_default(),
+        }
+        .into())
+    }
+}

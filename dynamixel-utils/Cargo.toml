@@ -19,5 +19,6 @@ nix = "^0.23"
 regex = "1.5.4"
 thiserror = "^1"
 serialport = "^4"
+tokio-serial = { version = "5", features = ["bytes", "codec", "libudev", "rt", "tokio-util"] }
 
 [features]

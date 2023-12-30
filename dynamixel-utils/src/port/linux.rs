@@ -42,6 +42,27 @@ impl Rs485 for NativePort {
     }
 }
 
+impl Rs485 for super::SerialStream {
+    fn rs485_is_enabled(&self) -> Result<bool> {
+        let mut rs485 = ioctl::serial_rs485::default();
+        match unsafe { ioctl::serial_rs485_get(self.as_raw_fd(), &mut rs485) } {
+            Ok(_) => Ok(rs485.flags & ioctl::SER_RS485_ENABLED != 0),
+            Err(err) => Err(err.into()),
+        }
+    }
+
+    fn rs485_enable(&self, enable: bool) -> Result<()> {
+        let mut rs485 = ioctl::serial_rs485::default();
+        if enable {
+            rs485.flags |= ioctl::SER_RS485_ENABLED | ioctl::SER_RS485_RTS_ON_SEND;
+        }
+        match unsafe { ioctl::serial_rs485_set(self.as_raw_fd(), &rs485) } {
+            Ok(_) => Ok(()),
+            Err(err) => Err(err.into()),
+        }
+    }
+}
+
 #[allow(dead_code)]
 mod ioctl {
     use super::*;

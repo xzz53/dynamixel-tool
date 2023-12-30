@@ -9,13 +9,16 @@ mod windows;
 use linux::is_port_open;
 #[cfg(target_os = "macos")]
 use macos::is_port_open;
+use tokio_serial::SerialPortBuilderExt;
 #[cfg(target_os = "windows")]
 use windows::is_port_open;
+
+pub use serialport::SerialPort;
+pub use tokio_serial::SerialStream;
 
 use anyhow::Result;
 use core::time::Duration;
 use log::debug;
-pub use serialport::SerialPort;
 use serialport::{self, SerialPortType};
 use thiserror::Error;
 
@@ -71,7 +74,7 @@ pub fn open_port(
 
     let mut port = serialport::new(&true_name, baudrate).open_native()?;
 
-    if true_name.contains("ttyS") && port.rs485_enable(true).is_err() && !force {
+    if port.rs485_is_supported() && port.rs485_enable(true).is_err() && !force {
         return Err(OpenPortError::Rs485Error {
             port_name: true_name,
         }
@@ -82,6 +85,35 @@ pub fn open_port(
 
     debug!("open_port OK: {} @ {} baud", &true_name, baudrate);
     Ok(Box::new(port))
+}
+
+pub fn open_port_async(port_name: &str, baudrate: u32, force: bool) -> Result<SerialStream> {
+    let true_name: String = if port_name == "auto" {
+        guess_port()?
+    } else {
+        port_name.to_string()
+    };
+
+    if !force && is_port_open(&true_name) {
+        return Err(OpenPortError::PortBusy {
+            port_name: true_name,
+        }
+        .into());
+    }
+
+    let mut port = tokio_serial::new(&true_name, baudrate).open_native_async()?;
+
+    if port.rs485_is_supported() && port.rs485_enable(true).is_err() && !force {
+        return Err(OpenPortError::Rs485Error {
+            port_name: true_name,
+        }
+        .into());
+    }
+
+    port.set_timeout(Duration::from_millis(10))?;
+
+    debug!("open_port OK: {} @ {} baud", &true_name, baudrate);
+    Ok(port)
 }
 
 fn guess_port() -> Result<String> {
