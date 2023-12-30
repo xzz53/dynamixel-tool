@@ -1,7 +1,10 @@
-use super::{Protocol, ProtocolError, ProtocolVersion, Result, SerialPort};
 use crc::{self, Crc, CRC_16_UMTS};
 use log::debug;
+use serialport::SerialPort;
 use std::convert::TryInto;
+
+use super::Protocol;
+use crate::protocol::{ProtocolError, ProtocolVersion, Result};
 
 pub struct ProtocolV2<'a> {
     port: &'a mut dyn SerialPort,

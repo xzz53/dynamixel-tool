@@ -1,5 +1,8 @@
-use super::{Protocol, ProtocolError, ProtocolVersion, Result, SerialPort};
 use log::debug;
+use serialport::SerialPort;
+
+use super::Protocol;
+use crate::protocol::{ProtocolError, ProtocolVersion, Result};
 
 pub struct ProtocolV1<'a> {
     port: &'a mut dyn SerialPort,
@@ -64,7 +67,7 @@ impl<'a> Protocol for ProtocolV1<'a> {
     }
 
     fn version(&self) -> ProtocolVersion {
-        super::ProtocolVersion::V1
+        crate::protocol::ProtocolVersion::V1
     }
 }
 

@@ -1,13 +1,8 @@
-mod v1;
-mod v2;
+pub mod master;
 
 use anyhow::Result;
-use serialport::SerialPort;
 use std::{fmt::Display, str::FromStr};
 use thiserror::Error;
-
-use v1::ProtocolV1;
-use v2::ProtocolV2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ProtocolVersion {
@@ -39,17 +34,6 @@ impl FromStr for ProtocolVersion {
     }
 }
 
-pub fn make_protocol<'a>(
-    version: ProtocolVersion,
-    port: &'a mut dyn SerialPort,
-    retries: usize,
-) -> Box<dyn Protocol + 'a> {
-    match version {
-        ProtocolVersion::V1 => Box::new(ProtocolV1::new(port, retries)),
-        ProtocolVersion::V2 => Box::new(ProtocolV2::new(port, retries)),
-    }
-}
-
 #[derive(Error, Debug)]
 pub enum ProtocolError {
     #[error("corrupted status packet")]
@@ -60,11 +44,4 @@ pub enum ProtocolError {
     InvalidCount,
     #[error("dynamixel status error {0}")]
     StatusError(u8),
-}
-
-pub trait Protocol: Send {
-    fn scan(&mut self, scan_start: u8, scan_end: u8) -> Result<Vec<u8>>;
-    fn read(&mut self, id: u8, address: u16, count: u16) -> Result<Vec<u8>>;
-    fn write(&mut self, id: u8, address: u16, data: &[u8]) -> Result<()>;
-    fn version(&self) -> ProtocolVersion;
 }

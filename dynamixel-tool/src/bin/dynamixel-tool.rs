@@ -10,7 +10,7 @@ use std::{convert::TryFrom, convert::TryInto, fmt::Display};
 use cli::{Cli, MultiReadSpec, MultiWriteSpec, StructOpt};
 
 use dynamixel_utils::port;
-use dynamixel_utils::protocol::{self, Protocol, ProtocolVersion};
+use dynamixel_utils::protocol::{self, master::Protocol, ProtocolVersion};
 use dynamixel_utils::regs::{self, RegSpec};
 
 enum OutputFormat {
@@ -388,7 +388,8 @@ fn do_main() -> Result<String> {
         cli::Commands::ListRegisters { model } => cmd_list_registers(cli.protocol, &model, fmt),
         _ => {
             let mut port = port::open_port(&cli.port, cli.baudrate, cli.force)?;
-            let mut proto_box = protocol::make_protocol(cli.protocol, port.as_mut(), cli.retries);
+            let mut proto_box =
+                protocol::master::make_protocol(cli.protocol, port.as_mut(), cli.retries);
             let proto = proto_box.as_mut();
 
             match cli.command {
