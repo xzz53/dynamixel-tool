@@ -19,7 +19,7 @@ pub use tokio_serial::SerialStream;
 use anyhow::Result;
 use core::time::Duration;
 use log::debug;
-use serialport::{self, SerialPortType};
+use serialport::{self, ClearBuffer, SerialPortType};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -83,6 +83,7 @@ pub fn open_port(
 
     port.set_timeout(Duration::from_millis(10))?;
 
+    port.clear(ClearBuffer::All)?;
     debug!("open_port OK: {} @ {} baud", &true_name, baudrate);
     Ok(Box::new(port))
 }
@@ -101,7 +102,7 @@ pub fn open_port_async(port_name: &str, baudrate: u32, force: bool) -> Result<Se
         .into());
     }
 
-    let mut port = tokio_serial::new(&true_name, baudrate).open_native_async()?;
+    let port = tokio_serial::new(&true_name, baudrate).open_native_async()?;
 
     if port.rs485_is_supported() && port.rs485_enable(true).is_err() && !force {
         return Err(OpenPortError::Rs485Error {
@@ -110,9 +111,8 @@ pub fn open_port_async(port_name: &str, baudrate: u32, force: bool) -> Result<Se
         .into());
     }
 
-    port.set_timeout(Duration::from_millis(10))?;
-
-    debug!("open_port OK: {} @ {} baud", &true_name, baudrate);
+    port.clear(ClearBuffer::All)?;
+    debug!("open_port_async OK: {} @ {} baud", &true_name, baudrate);
     Ok(port)
 }
 
