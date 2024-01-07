@@ -9,9 +9,9 @@ use std::{convert::TryFrom, convert::TryInto, fmt::Display};
 
 use cli::{Cli, MultiReadSpec, MultiWriteSpec, StructOpt};
 
-use dynamixel_utils::port;
-use dynamixel_utils::protocol::{self, master::Protocol, ProtocolVersion};
-use dynamixel_utils::regs::{self, RegSpec};
+use dynamixel_lib::port;
+use dynamixel_lib::protocol::{self, master::Protocol, ProtocolVersion};
+use dynamixel_lib::regs::{self, RegSpec};
 
 enum OutputFormat {
     Plain,

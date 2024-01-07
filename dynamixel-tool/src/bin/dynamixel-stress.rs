@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use dynamixel_utils::port::{self, SerialPort};
-use dynamixel_utils::protocol::{self, ProtocolVersion};
+use dynamixel_lib::port::{self, SerialPort};
+use dynamixel_lib::protocol::{self, ProtocolVersion};
 use env_logger::TimestampPrecision;
 
 fn main() -> Result<()> {

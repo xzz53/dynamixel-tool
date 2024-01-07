@@ -1,5 +1,5 @@
 [package]
-name = "dynamixel-utils"
+name = "dynamixel-lib"
 version = "1.2.3"
 edition = "2018"
 authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
@@ -10,7 +10,7 @@ homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
 
 [dependencies]
 anyhow = "^1.0"
-async-trait = "0.1.76"
+async-trait = "0.1"
 crc = "^2.1"
 glob = "^0.3"
 itertools = "0.10.3"

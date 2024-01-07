@@ -2,9 +2,9 @@ use std::convert::TryInto;
 
 use anyhow::Result;
 
-use dynamixel_utils::port::{self};
-use dynamixel_utils::protocol::slave::{make_async_protocol, Opcode};
-use dynamixel_utils::protocol::ProtocolVersion;
+use dynamixel_lib::port::{self};
+use dynamixel_lib::protocol::slave::{make_async_protocol, Opcode};
+use dynamixel_lib::protocol::ProtocolVersion;
 use env_logger::TimestampPrecision;
 
 #[tokio::main]

@@ -2,5 +2,5 @@
 
 members = [
     "dynamixel-tool",
-    "dynamixel-utils",
+    "dynamixel-lib",
 ]
