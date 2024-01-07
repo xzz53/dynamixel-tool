@@ -1,4 +1,5 @@
 pub mod master;
+pub mod slave;
 
 use anyhow::Result;
 use std::{fmt::Display, str::FromStr};
