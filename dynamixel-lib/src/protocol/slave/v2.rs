@@ -35,17 +35,19 @@ impl<'a> ProtocolV2<'a> {
             let to_read = n - self.deq.len();
             let buf = &mut self.buf[0..to_read];
 
-            let res = timeout(Duration::from_millis(100), self.port.read_exact(buf)).await;
-            if res.is_err() {
-                // debug!("timed out reading {to_read} bytes");
-                self.deq.clear();
-                continue;
-            }
+            let res = timeout(Duration::from_millis(100), self.port.read(buf)).await;
 
-            let res = res.unwrap()?;
-            debug!("read {} bytes: {:02x?}", res, buf);
-            self.deq.extend(buf.iter());
-            break;
+            match res {
+                Ok(Ok(bytes_read)) if bytes_read == to_read => {
+                    debug!("read {} bytes: {:02x?}", to_read, buf);
+                    self.deq.extend(buf.iter());
+                    break;
+                }
+                _ => {
+                    self.deq.clear();
+                    continue;
+                }
+            }
         }
         Ok(())
     }
