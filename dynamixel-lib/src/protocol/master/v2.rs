@@ -1,7 +1,11 @@
+use std::{
+    convert::TryInto,
+    io::{Cursor, Write},
+};
+
 use crc::{self, Crc, CRC_16_UMTS};
 use log::debug;
 use serialport::SerialPort;
-use std::convert::TryInto;
 
 use super::Protocol;
 use crate::protocol::{ProtocolError, ProtocolVersion, Result};
@@ -57,11 +61,26 @@ impl<'a> Protocol for ProtocolV2<'a> {
     fn version(&self) -> ProtocolVersion {
         super::ProtocolVersion::V2
     }
+
+    fn sync_write(&mut self, ids: &[u8], address: u16, data: &[&[u8]]) -> Result<()> {
+        let mut error = None;
+
+        for _ in 0..=self.retries {
+            match sync_write1(self.port, ids, address, data) {
+                Ok(data) => return Ok(data),
+                Err(e) => error = Some(e),
+            }
+        }
+        Err(error.unwrap())
+    }
 }
 
 const OPCODE_PING: u8 = 1;
 const OPCODE_READ: u8 = 2;
 const OPCODE_WRITE: u8 = 3;
+const OPCODE_SYNC_WRITE: u8 = 0x83;
+
+const BROADCAST_ID: u8 = 0xFE;
 
 fn encode_instruction_v2(buffer: &mut [u8], id: u8, instruction: u8, params: &[u8]) -> usize {
     let length = (3 + params.len()) as u16;
@@ -173,4 +192,33 @@ fn write1(port: &mut dyn SerialPort, id: u8, address: u16, data: &[u8]) -> Resul
     debug!("recv {:02X?}", &buffer[0..len_read]);
 
     decode_status_v2(&buffer, &mut params).map(|_| Ok(()))?
+}
+
+fn sync_write1(port: &mut dyn SerialPort, ids: &[u8], address: u16, data: &[&[u8]]) -> Result<()> {
+    let mut buffer: [u8; 65535] = [0; 65535];
+    let mut params: [u8; 65535] = [0; 65535];
+
+    let mut req = Cursor::new(params.as_mut_slice());
+
+    req.write_all(&address.to_le_bytes())?;
+    req.write_all(&(data[0].len() as u16).to_le_bytes())?;
+
+    if ids.len() != data.len() {
+        return Err(ProtocolError::InvalidArg.into());
+    }
+
+    for (i, id) in ids.iter().enumerate() {
+        req.write_all(&id.to_le_bytes())?;
+        req.write_all(data[i])?;
+    }
+
+    let n_params = req.position();
+    let len_write = encode_instruction_v2(
+        &mut buffer,
+        BROADCAST_ID,
+        OPCODE_SYNC_WRITE,
+        &params[..n_params as usize],
+    );
+    debug!("sync_write: send {:02X?}", &buffer[0..len_write]);
+    Ok(port.write_all(&buffer[0..len_write])?)
 }

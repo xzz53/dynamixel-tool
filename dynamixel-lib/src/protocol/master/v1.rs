@@ -69,6 +69,10 @@ impl<'a> Protocol for ProtocolV1<'a> {
     fn version(&self) -> ProtocolVersion {
         crate::protocol::ProtocolVersion::V1
     }
+
+    fn sync_write(&mut self, _ids: &[u8], _address: u16, _data: &[&[u8]]) -> Result<()> {
+        Err(ProtocolError::NotSupported.into())
+    }
 }
 
 const OPCODE_PING: u8 = 1;

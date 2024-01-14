@@ -267,31 +267,37 @@ pub enum Commands {
     /// Write unsigned 8-bit integer
     #[clap(visible_alias = "writeb")]
     WriteUint8 {
+        #[clap(short, short)]
+        sync: bool,
         ids: IdRange,
         #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
-        #[clap(parse(try_from_str=parse_with_radix))]
-        value: u8,
+        #[clap(parse(try_from_str=parse_with_radix), min_values(1))]
+        value: Vec<u8>,
     },
 
     /// Write unsigned 16-bit integer
     #[clap(visible_alias = "writeh")]
     WriteUint16 {
+        #[clap(long, short)]
+        sync: bool,
         ids: IdRange,
         #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
-        #[clap(parse(try_from_str=parse_with_radix))]
-        value: u16,
+        #[clap(parse(try_from_str=parse_with_radix), min_values(1))]
+        value: Vec<u16>,
     },
 
     /// Write unsigned 32-bit integer
     #[clap(visible_alias = "writew")]
     WriteUint32 {
+        #[clap(long, short)]
+        sync: bool,
         ids: IdRange,
         #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
-        #[clap(parse(try_from_str=parse_with_radix))]
-        value: u32,
+        #[clap(parse(try_from_str=parse_with_radix), min_values(1))]
+        value: Vec<u32>,
     },
 
     /// Write byte array

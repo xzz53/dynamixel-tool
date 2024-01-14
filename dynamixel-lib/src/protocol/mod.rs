@@ -45,4 +45,8 @@ pub enum ProtocolError {
     InvalidCount,
     #[error("dynamixel status error {0}")]
     StatusError(u8),
+    #[error("operation not supported for this protocol")]
+    NotSupported,
+    #[error("invalid argument")]
+    InvalidArg,
 }

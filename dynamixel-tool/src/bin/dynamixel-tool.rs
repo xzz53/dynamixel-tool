@@ -1,17 +1,19 @@
 pub mod cli;
 
+use std::io;
+use std::{convert::TryFrom, convert::TryInto, fmt::Display};
+
 use anyhow::{anyhow, Context, Result};
 use clap::CommandFactory;
 use clap_complete::{generate, shells::Bash};
 use log::error;
-use std::io;
-use std::{convert::TryFrom, convert::TryInto, fmt::Display};
-
-use cli::{Cli, MultiReadSpec, MultiWriteSpec, StructOpt};
+use num_traits::ToBytes;
 
 use dynamixel_lib::port;
 use dynamixel_lib::protocol::{self, master::Protocol, ProtocolVersion};
 use dynamixel_lib::regs::{self, RegSpec};
+
+use cli::{Cli, MultiReadSpec, MultiWriteSpec, StructOpt};
 
 enum OutputFormat {
     Plain,
@@ -36,6 +38,15 @@ where
         .map(|id| id.to_string())
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+fn slice_to_byte_slices<T: Copy>(slice: &[T]) -> Vec<&[u8]> {
+    slice
+        .iter()
+        .map(|x| unsafe {
+            std::slice::from_raw_parts((x as *const T) as *const u8, std::mem::size_of::<T>())
+        })
+        .collect()
 }
 
 fn cmd_list_models(proto: ProtocolVersion, fmt: OutputFormat) -> Result<String> {
@@ -253,52 +264,34 @@ fn cmd_read_reg(
     })
 }
 
-fn cmd_write_uint8(
+fn cmd_write_int<const N: usize, T: Copy + ToBytes<Bytes = [u8; N]>>(
     proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
-    value: u8,
+    values: &[T],
+    sync: bool,
 ) -> Result<String> {
-    ids.iter()
-        .map(|&id| {
-            proto
-                .write(id, address, &[value])
-                .with_context(|| format!("Failed to write uint8 to id {}", id))
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .map(|_| Ok(String::new()))?
-}
+    if !sync {
+        if values.len() != 1 {
+            return Err(anyhow!("Multiple values supported in sync mode only"));
+        }
+        ids.iter()
+            .map(|&id| {
+                proto
+                    .write(id, address, values[0].to_le_bytes().as_slice())
+                    .with_context(|| format!("Failed to write uint8 to id {}", id))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|_| Ok(String::new()))?
+    } else {
+        if values.len() != ids.len() {
+            return Err(anyhow!("Need {} values, got {}", ids.len(), values.len()));
+        }
 
-fn cmd_write_uint16(
-    proto: &mut dyn Protocol,
-    ids: &[u8],
-    address: u16,
-    value: u16,
-) -> Result<String> {
-    ids.iter()
-        .map(|&id| {
-            proto
-                .write(id, address, &value.to_le_bytes())
-                .with_context(|| format!("Failed to write uint16 to id {}", id))
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .map(|_| Ok(String::new()))?
-}
-
-fn cmd_write_uint32(
-    proto: &mut dyn Protocol,
-    ids: &[u8],
-    address: u16,
-    value: u32,
-) -> Result<String> {
-    ids.iter()
-        .map(|&id| {
-            proto
-                .write(id, address, &value.to_le_bytes())
-                .with_context(|| format!("Failed to write uint32 to id {}", id))
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .map(|_| Ok(String::new()))?
+        proto
+            .sync_write(ids, address, &slice_to_byte_slices(values))
+            .map(|_| Ok(String::new()))?
+    }
 }
 
 fn cmd_write_bytes(
@@ -419,17 +412,20 @@ fn do_main() -> Result<String> {
                     ids,
                     address,
                     value,
-                } => cmd_write_uint8(proto, &ids, address, value),
+                    sync,
+                } => cmd_write_int(proto, &ids, address, &value, sync),
                 cli::Commands::WriteUint16 {
                     ids,
                     address,
                     value,
-                } => cmd_write_uint16(proto, &ids, address, value),
+                    sync,
+                } => cmd_write_int(proto, &ids, address, &value, sync),
                 cli::Commands::WriteUint32 {
                     ids,
                     address,
                     value,
-                } => cmd_write_uint32(proto, &ids, address, value),
+                    sync,
+                } => cmd_write_int(proto, &ids, address, &value, sync),
                 cli::Commands::WriteBytes {
                     ids,
                     address,
