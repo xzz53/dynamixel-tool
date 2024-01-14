@@ -10,6 +10,7 @@ pub trait Protocol: Send {
     fn read(&mut self, id: u8, address: u16, count: u16) -> Result<Vec<u8>>;
     fn write(&mut self, id: u8, address: u16, data: &[u8]) -> Result<()>;
     fn sync_write(&mut self, ids: &[u8], address: u16, data: &[&[u8]]) -> Result<()>;
+    fn sync_read(&mut self, ids: &[u8], address: u16, count: u16) -> Result<Vec<Vec<u8>>>;
 
     fn version(&self) -> ProtocolVersion;
 }

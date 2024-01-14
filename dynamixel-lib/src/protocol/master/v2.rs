@@ -73,11 +73,23 @@ impl<'a> Protocol for ProtocolV2<'a> {
         }
         Err(error.unwrap())
     }
+
+    fn sync_read(&mut self, ids: &[u8], address: u16, count: u16) -> Result<Vec<Vec<u8>>> {
+        let mut error = None;
+        for _ in 0..=self.retries {
+            match sync_read1(self.port, ids, address, count) {
+                Ok(data) => return Ok(data),
+                Err(e) => error = Some(e),
+            }
+        }
+        Err(error.unwrap())
+    }
 }
 
 const OPCODE_PING: u8 = 1;
 const OPCODE_READ: u8 = 2;
 const OPCODE_WRITE: u8 = 3;
+const OPCODE_SYNC_READ: u8 = 0x82;
 const OPCODE_SYNC_WRITE: u8 = 0x83;
 
 const BROADCAST_ID: u8 = 0xFE;
@@ -221,4 +233,44 @@ fn sync_write1(port: &mut dyn SerialPort, ids: &[u8], address: u16, data: &[&[u8
     );
     debug!("sync_write: send {:02X?}", &buffer[0..len_write]);
     Ok(port.write_all(&buffer[0..len_write])?)
+}
+
+fn sync_read1(
+    port: &mut dyn SerialPort,
+    ids: &[u8],
+    address: u16,
+    count: u16,
+) -> Result<Vec<Vec<u8>>> {
+    let mut buffer: [u8; 65535] = [0; 65535];
+    let mut params: [u8; 65535] = [0; 65535];
+    let mut req = Cursor::new(params.as_mut_slice());
+    let mut result = Vec::new();
+
+    req.write_all(&address.to_le_bytes())?;
+    req.write_all(&count.to_le_bytes())?;
+
+    for id in ids.iter() {
+        req.write_all(&id.to_le_bytes())?;
+    }
+
+    let n_params = req.position();
+    let len_write = encode_instruction_v2(
+        &mut buffer,
+        BROADCAST_ID,
+        OPCODE_SYNC_READ,
+        &params[..n_params as usize],
+    );
+    debug!("sync_read: send {:02X?}", &buffer[0..len_write]);
+    port.write_all(&buffer[0..len_write])?;
+
+    let len_read = (11 + count) as usize;
+
+    for _ in ids {
+        port.read_exact(&mut buffer[0..len_read])?;
+        debug!("recv {:02X?}", &buffer[0..len_read]);
+        result
+            .push(decode_status_v2(&buffer, &mut params).map(|_| params[0..count.into()].to_vec())?)
+    }
+
+    Ok(result)
 }

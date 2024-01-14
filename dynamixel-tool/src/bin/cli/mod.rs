@@ -223,6 +223,8 @@ pub enum Commands {
     /// Read unsigned 8-bit integer
     #[clap(visible_alias = "readb")]
     ReadUint8 {
+        #[clap(short, short)]
+        sync: bool,
         ids: IdRange,
         #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
@@ -231,6 +233,8 @@ pub enum Commands {
     /// Read unsigned 16-bit integer
     #[clap(visible_alias = "readh")]
     ReadUint16 {
+        #[clap(short, short)]
+        sync: bool,
         ids: IdRange,
         #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,
@@ -239,6 +243,8 @@ pub enum Commands {
     /// Read unsigned 32-bit integer
     #[clap(visible_alias = "readw")]
     ReadUint32 {
+        #[clap(short, short)]
+        sync: bool,
         ids: IdRange,
         #[clap(parse(try_from_str=parse_with_radix))]
         address: u16,

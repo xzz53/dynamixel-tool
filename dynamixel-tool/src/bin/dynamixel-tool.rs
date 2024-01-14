@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::CommandFactory;
 use clap_complete::{generate, shells::Bash};
 use log::error;
-use num_traits::ToBytes;
+use num_traits::{FromBytes, ToBytes};
 
 use dynamixel_lib::port;
 use dynamixel_lib::protocol::{self, master::Protocol, ProtocolVersion};
@@ -84,76 +84,37 @@ fn cmd_scan(
     })
 }
 
-fn cmd_read_uint8(
+fn cmd_read_int<const N: usize, T>(
     proto: &mut dyn Protocol,
     ids: &[u8],
     address: u16,
     fmt: OutputFormat,
-) -> Result<String> {
-    let res = ids
-        .iter()
-        .map(|&id| -> Result<u8> {
-            Ok(proto
-                .read(id, address, 1)
-                .with_context(|| format!("Failed to read uint8 from id {}", id))?[0])
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
-    Ok(match fmt {
-        OutputFormat::Plain => slice_to_line(res.as_slice()),
-        OutputFormat::Json => {
-            if res.len() > 1 {
-                json::stringify(res)
-            } else {
-                res[0].to_string()
-            }
-        }
-    })
-}
-
-fn cmd_read_uint16(
-    proto: &mut dyn Protocol,
-    ids: &[u8],
-    address: u16,
-    fmt: OutputFormat,
-) -> Result<String> {
-    let res = ids
-        .iter()
-        .map(|&id| -> Result<u16> {
-            let bytes = proto
-                .read(id, address, 2)
-                .with_context(|| format!("Failed to read uint16 from id {}", id))?;
-            Ok(u16::from_le_bytes(bytes.as_slice().try_into().unwrap()))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
-    Ok(match fmt {
-        OutputFormat::Plain => slice_to_line(res.as_slice()),
-        OutputFormat::Json => {
-            if res.len() > 1 {
-                json::stringify(res)
-            } else {
-                res[0].to_string()
-            }
-        }
-    })
-}
-
-fn cmd_read_uint32(
-    proto: &mut dyn Protocol,
-    ids: &[u8],
-    address: u16,
-    fmt: OutputFormat,
-) -> Result<String> {
-    let res = ids
-        .iter()
-        .map(|&id| -> Result<u32> {
-            let bytes = proto
-                .read(id, address, 4)
-                .with_context(|| format!("Failed to read uint32 from id {}", id))?;
-            Ok(u32::from_le_bytes(bytes.as_slice().try_into().unwrap()))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    sync: bool,
+) -> Result<String>
+where
+    T: Copy + Display + FromBytes<Bytes = [u8; N]>,
+    T: Into<json::JsonValue>,
+{
+    let res = if !sync {
+        ids.iter()
+            .map(|&id| -> Result<T> {
+                let bytes = proto.read(id, address, N as u16).with_context(|| {
+                    format!(
+                        "Failed to read {} from id {}",
+                        std::any::type_name::<T>(),
+                        id
+                    )
+                })?;
+                Ok(T::from_le_bytes(bytes.as_slice().try_into().unwrap()))
+            })
+            .collect::<Result<Vec<_>, _>>()?
+    } else {
+        proto
+            .sync_read(ids, address, N as u16)?
+            .into_iter()
+            .map(|bytes| T::from_le_bytes(bytes[..N].try_into().unwrap()))
+            .collect()
+    };
 
     Ok(match fmt {
         OutputFormat::Plain => slice_to_line(res.as_slice()),
@@ -279,7 +240,13 @@ fn cmd_write_int<const N: usize, T: Copy + ToBytes<Bytes = [u8; N]>>(
             .map(|&id| {
                 proto
                     .write(id, address, values[0].to_le_bytes().as_slice())
-                    .with_context(|| format!("Failed to write uint8 to id {}", id))
+                    .with_context(|| {
+                        format!(
+                            "Failed to write {} to id {}",
+                            std::any::type_name::<T>(),
+                            id
+                        )
+                    })
             })
             .collect::<Result<Vec<_>, _>>()
             .map(|_| Ok(String::new()))?
@@ -390,14 +357,14 @@ fn do_main() -> Result<String> {
                     scan_start,
                     scan_end,
                 } => cmd_scan(proto, scan_start, scan_end, fmt),
-                cli::Commands::ReadUint8 { ids, address } => {
-                    cmd_read_uint8(proto, &ids, address, fmt)
+                cli::Commands::ReadUint8 { ids, address, sync } => {
+                    cmd_read_int::<1, u8>(proto, &ids, address, fmt, sync)
                 }
-                cli::Commands::ReadUint16 { ids, address } => {
-                    cmd_read_uint16(proto, &ids, address, fmt)
+                cli::Commands::ReadUint16 { ids, address, sync } => {
+                    cmd_read_int::<2, u16>(proto, &ids, address, fmt, sync)
                 }
-                cli::Commands::ReadUint32 { ids, address } => {
-                    cmd_read_uint32(proto, &ids, address, fmt)
+                cli::Commands::ReadUint32 { ids, address, sync } => {
+                    cmd_read_int::<4, u32>(proto, &ids, address, fmt, sync)
                 }
                 cli::Commands::ReadBytes {
                     ids,
