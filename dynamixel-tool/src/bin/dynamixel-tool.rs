@@ -251,13 +251,23 @@ fn cmd_write_int<const N: usize, T: Copy + ToBytes<Bytes = [u8; N]>>(
             .collect::<Result<Vec<_>, _>>()
             .map(|_| Ok(String::new()))?
     } else {
-        if values.len() != ids.len() {
+        if values.len() != ids.len() && values.len() != 1 {
             return Err(anyhow!("Need {} values, got {}", ids.len(), values.len()));
         }
 
-        proto
-            .sync_write(ids, address, &slice_to_byte_slices(values))
-            .map(|_| Ok(String::new()))?
+        if values.len() != 1 {
+            proto
+                .sync_write(ids, address, &slice_to_byte_slices(values))
+                .map(|_| Ok(String::new()))?
+        } else {
+            proto
+                .sync_write(
+                    ids,
+                    address,
+                    &slice_to_byte_slices(&vec![values[0]; ids.len()]),
+                )
+                .map(|_| Ok(String::new()))?
+        }
     }
 }
 
