@@ -343,9 +343,9 @@ fn do_main() -> Result<String> {
     } else {
         "info"
     }))
-    .format_timestamp(None)
-    .format_target(false)
-    .init();
+        .format_timestamp(Some(env_logger::TimestampPrecision::Micros))
+        .format_target(false)
+        .init();
 
     let fmt = if cli.json {
         OutputFormat::Json
