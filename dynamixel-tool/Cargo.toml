@@ -1,6 +1,6 @@
 [package]
 name = "dynamixel-tool"
-version = "2.0.1"
+version = "2.0.2"
 edition = "2021"
 authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
 description = "Dynamixel cli tool"
