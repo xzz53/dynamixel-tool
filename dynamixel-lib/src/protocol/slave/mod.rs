@@ -7,9 +7,10 @@ use tokio_serial::SerialStream;
 
 use super::{ProtocolVersion, Result};
 
-#[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
 pub enum Opcode {
+    StatusV1 = 0x00,
     Ping = 0x01,
     Read = 0x02,
     Write = 0x03,
@@ -19,6 +20,7 @@ pub enum Opcode {
     Reboot = 0x08,
     Clear = 0x10,
     ControlTableBackup = 0x20,
+    StatusV2 = 0x55,
     SyncRead = 0x82,
     SyncWrite = 0x83,
     FastSyncRead = 0x8A,

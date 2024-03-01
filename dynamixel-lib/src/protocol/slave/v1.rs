@@ -7,7 +7,7 @@ use tokio::{io::AsyncReadExt, time::timeout};
 use tokio_serial::SerialStream;
 
 use super::{AsyncProtocol, Opcode, RawInstruction};
-use crate::protocol::{ProtocolVersion::V1, Result};
+use crate::protocol::{ProtocolVersion::V1, Result, ProtocolError};
 
 pub struct ProtocolV1<'a> {
     port: &'a mut SerialStream,
@@ -29,25 +29,23 @@ impl<'a> ProtocolV1<'a> {
             return Ok(());
         }
 
-        loop {
-            let to_read = n - self.deq.len();
-            let buf = &mut self.buf[0..to_read];
 
-            let res = timeout(Duration::from_millis(100), self.port.read(buf)).await;
+        let to_read = n - self.deq.len();
+        let buf = &mut self.buf[0..to_read];
 
-            match res {
-                Ok(Ok(bytes_read)) if bytes_read == to_read => {
-                    debug!("read {} bytes: {:02x?}", to_read, buf);
-                    self.deq.extend(buf.iter());
-                    break;
-                }
-                _ => {
-                    self.deq.clear();
-                    continue;
-                }
+        let res = timeout(Duration::from_millis(100), self.port.read(buf)).await;
+
+        match res {
+            Ok(Ok(bytes_read)) if bytes_read == to_read => {
+                debug!("read {} bytes: {:02x?}", to_read, buf);
+                self.deq.extend(buf.iter());
+                Ok(())
+            }
+            _ => {
+                debug!("ensure_buffer timeout");
+                Err(ProtocolError::TimedOut.into())
             }
         }
-        Ok(())
     }
 }
 
@@ -55,8 +53,8 @@ impl<'a> ProtocolV1<'a> {
 impl<'a> AsyncProtocol for ProtocolV1<'a> {
     async fn recv_instruction(&mut self) -> Result<RawInstruction> {
         loop {
+            while self.ensure_buffer(4).await.is_err() {}
             debug!("recv loop start");
-            self.ensure_buffer(4).await?;
 
             if self.deq[0] != 0xFF {
                 self.deq.pop_front();
@@ -76,7 +74,7 @@ impl<'a> AsyncProtocol for ProtocolV1<'a> {
                 self.deq.pop_front();
                 continue;
             }
-            debug!("got id {id:02}");
+            debug!("got id {id:02}, deq: {:?}", self.deq);
 
             let len = self.deq[3];
             if len == 0x00 {
@@ -86,7 +84,10 @@ impl<'a> AsyncProtocol for ProtocolV1<'a> {
             }
             debug!("got len {len:02}");
 
-            self.ensure_buffer(4 + len as usize).await?;
+            if self.ensure_buffer(4 + len as usize).await.is_err() {
+                self.deq.clear();
+                continue;
+            }
 
             let opcode = Opcode::from_u8(self.deq[4]);
             if opcode.is_none() {
@@ -109,6 +110,12 @@ impl<'a> AsyncProtocol for ProtocolV1<'a> {
                 continue;
             }
 
+            if opcode == Opcode::StatusV1 {
+                debug!("discarding status packet");
+                self.deq.clear();
+                continue;
+            }
+
             let res = RawInstruction {
                 version: V1,
                 id,
@@ -119,7 +126,10 @@ impl<'a> AsyncProtocol for ProtocolV1<'a> {
                     .copied()
                     .collect(),
             };
-            self.deq.drain(0..len as usize + 3);
+
+            debug!("full deq: {:?}", self.deq);
+            self.deq.clear();
+
             return Ok(res);
         }
     }
@@ -148,6 +158,7 @@ impl<'a> AsyncProtocol for ProtocolV1<'a> {
         self.buf[end_pos] = csum;
         {
             use tokio::io::AsyncWriteExt;
+            debug!("dxl write: {:X?}", &self.buf[0..=end_pos]);
             self.port.write_all(&self.buf[0..=end_pos]).await?;
         }
 

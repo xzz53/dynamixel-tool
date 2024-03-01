@@ -49,4 +49,6 @@ pub enum ProtocolError {
     NotSupported,
     #[error("invalid argument")]
     InvalidArg,
+    #[error("io timed out")]
+    TimedOut,
 }
