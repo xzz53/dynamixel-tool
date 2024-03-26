@@ -54,10 +54,11 @@ static COMPATIBLE_IDS: &[UsbId] = &[
     UsbId(0x0483, 0x5740), // STMicroelectronics Virtual COM Port
 ];
 
-pub fn open_port(
+fn open_port_impl(
     port_name: &str,
     baudrate: u32,
     force: bool,
+    rs485: bool
 ) -> Result<Box<dyn SerialPort + Send>> {
     let true_name: String = if port_name == "auto" {
         guess_port()?
@@ -74,7 +75,7 @@ pub fn open_port(
 
     let mut port = serialport::new(&true_name, baudrate).open_native()?;
 
-    if port.rs485_is_supported() && port.rs485_enable(true).is_err() && !force {
+    if port.rs485_is_supported() && port.rs485_enable(rs485).is_err() && !force {
         return Err(OpenPortError::Rs485Error {
             port_name: true_name,
         }
@@ -88,7 +89,24 @@ pub fn open_port(
     Ok(Box::new(port))
 }
 
-pub fn open_port_async(port_name: &str, baudrate: u32, force: bool) -> Result<SerialStream> {
+
+pub fn open_port(
+    port_name: &str,
+    baudrate: u32,
+    force: bool,
+) -> Result<Box<dyn SerialPort + Send>> {
+    open_port_impl(port_name, baudrate, force, true)
+}
+
+pub fn open_port_plain(
+    port_name: &str,
+    baudrate: u32,
+    force: bool,
+) -> Result<Box<dyn SerialPort + Send>> {
+    open_port_impl(port_name, baudrate, force, false)
+}
+
+fn open_port_async_impl(port_name: &str, baudrate: u32, force: bool, rs485: bool) -> Result<SerialStream> {
     let true_name: String = if port_name == "auto" {
         guess_port()?
     } else {
@@ -104,7 +122,7 @@ pub fn open_port_async(port_name: &str, baudrate: u32, force: bool) -> Result<Se
 
     let port = tokio_serial::new(&true_name, baudrate).open_native_async()?;
 
-    if port.rs485_is_supported() && port.rs485_enable(true).is_err() && !force {
+    if port.rs485_is_supported() && port.rs485_enable(rs485).is_err() && !force {
         return Err(OpenPortError::Rs485Error {
             port_name: true_name,
         }
@@ -114,6 +132,14 @@ pub fn open_port_async(port_name: &str, baudrate: u32, force: bool) -> Result<Se
     port.clear(ClearBuffer::All)?;
     debug!("open_port_async OK: {} @ {} baud", &true_name, baudrate);
     Ok(port)
+}
+
+pub fn open_port_async(port_name: &str, baudrate: u32, force: bool) -> Result<SerialStream> {
+    open_port_async_impl(port_name, baudrate, force, true)
+}
+
+pub fn open_port_async_plain(port_name: &str, baudrate: u32, force: bool) -> Result<SerialStream> {
+    open_port_async_impl(port_name, baudrate, force, false)
 }
 
 fn guess_port() -> Result<String> {
