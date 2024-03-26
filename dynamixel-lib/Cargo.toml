@@ -1,10 +1,10 @@
 [package]
 name = "dynamixel-lib"
-version = "2.0.2"
-edition = "2021"
-authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
 description = "Dynamixel utilities library"
-homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+version.workspace = true
 
 [lib]
 

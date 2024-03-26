@@ -1,7 +1,12 @@
 [workspace]
 resolver = "2"
-
 members = [
     "dynamixel-tool",
     "dynamixel-lib",
 ]
+
+[workspace.package]
+authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
+edition = "2021"
+homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
+version = "2.0.2"

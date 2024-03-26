@@ -1,10 +1,10 @@
 [package]
 name = "dynamixel-tool"
-version = "2.0.2"
-edition = "2021"
-authors = ["Mikhail Rudenko <mike.rudenko@gmail.com>"]
 description = "Dynamixel cli tool"
-homepage = "https://gitlab.mobird.dev/pebby/dynamixel-tool"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+version.workspace = true
 default-run = "dynamixel-tool"
 
 [dependencies]
